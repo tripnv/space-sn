@@ -129,14 +129,13 @@ class SpaceSnake(Sketch):
         super().__init__()
         self.space_representation = np.zeros((GRID_NUM, GRID_NUM, GRID_NUM))
         # self.snake = Snake(self.generate_empty_block())
-        self.snake = Snake(Block(0, 9, 9))
-        self.update_space_representation()
+        self.snake = Snake(Block(5, 5, 5))
         self.food = self.generate_empty_block()
 
     def reset(self):
         self.space_representation = np.zeros((GRID_NUM, GRID_NUM, GRID_NUM))
-        self.snake = Snake(Block(0, 9, 9))
-        self.update_space_representation()
+        self.snake = Snake(Block(5, 5, 5))
+        # self.update_space_representation()
         self.food = self.generate_empty_block()
 
     # def generate_empty_block(self):
@@ -155,16 +154,19 @@ class SpaceSnake(Sketch):
     #     return empty_block
 
     def generate_empty_block(self):
-        tail_set = set([block.as_tuple() for block in self.snake.tail])
-        tail_set.add(self.snake.head.as_tuple())
+        if self.snake.tail:
+            tail_set = set([block.as_tuple() for block in self.snake.tail])
+            tail_set.add(self.snake.head.as_tuple())
+        else:
+            tail_set = set(self.snake.head.as_tuple())
         empty = choice(list(POSSIBLE_COORDINATES.difference(tail_set)))
         empty_block = Block(empty[0], empty[1], empty[2])
 
         return empty_block
 
-    def update_space_representation(self):
-        # Head
-        ...
+    def step(self):
+        self.snake.update_snake()
+        self.check_food_collision()
 
     def check_food_collision(self):
         if self.snake.head.__eq__(self.food):
@@ -394,8 +396,7 @@ class SpaceSnake(Sketch):
             # block.z += UNIT_SIZE
             self.snake.head_direction = self.snake.directions["z_forward"]
 
-        self.snake.update_snake()
-        self.check_food_collision()
+        self.step()
 
 
 test = SpaceSnake()
