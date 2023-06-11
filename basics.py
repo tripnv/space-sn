@@ -63,7 +63,6 @@ class Snake:
     def update_snake(self):
         head_previous_position = Block(self.head.x, self.head.y, self.head.z)
         self.head.update(self.head.as_numpy() + self.head_direction)
-
         if self.length > 1:
             if self.state == 0:
                 self.tail.insert(0, head_previous_position)
@@ -79,7 +78,10 @@ class Snake:
                 self.state = 0
                 self.length += 1
 
-    def check_status(self):
+        self.check_self_collision()
+        self.check_out_of_bounds()
+
+    def check_out_of_bounds(self):
         # Out of bounds check
         head_coordinates = self.head.as_numpy()
         if not ((0 <= head_coordinates) & (head_coordinates < GRID_NUM)).all():
@@ -89,6 +91,16 @@ class Snake:
         # Hesitating about the case when it's right behind itself
         # Check probably needs to be split
         # Self bite check before update, oob after update
+
+    def check_self_collision(self):
+        collision = False
+        if self.length > 1:
+            tail_len = self.length - 1
+            tail_idx = 0
+            while (not collision) and tail_idx < tail_len:
+                if self.head.__eq__(self.tail[tail_idx]):
+                    self.status = False
+                tail_idx += 1
 
 
 screen_height = 1914
@@ -109,10 +121,16 @@ start_position = middle_y
 
 # %%
 class SpaceSnake(Sketch):
-    def __init__(self, grid_num) -> None:
+    def __init__(self) -> None:
         super().__init__()
-        self.space_representation = np.zeros((grid_num, grid_num, grid_num))
+        self.space_representation = np.zeros((GRID_NUM, GRID_NUM, GRID_NUM))
         # self.snake = Snake(self.generate_empty_block())
+        self.snake = Snake(Block(0, 9, 9))
+        self.update_space_representation()
+        self.food = self.generate_empty_block()
+
+    def reset(self):
+        self.space_representation = np.zeros((GRID_NUM, GRID_NUM, GRID_NUM))
         self.snake = Snake(Block(0, 9, 9))
         self.update_space_representation()
         self.food = self.generate_empty_block()
@@ -136,7 +154,7 @@ class SpaceSnake(Sketch):
         ...
 
     def check_food_collision(self):
-        if self.snake.head.as_list() == self.food.as_list():
+        if self.snake.head.__eq__(self.food):
             self.snake.has_eaten()
             self.food = self.generate_empty_block()
 
@@ -150,6 +168,9 @@ class SpaceSnake(Sketch):
         camera = self.camera()
 
     def draw(self):
+        if self.snake.status == False:
+            self.reset()
+            # print("Died")
         c_green_25 = self.color(0, 255, 0, 25)
         c_green_50 = self.color(200, 255, 0, 50)
         c_red_50 = self.color(255, 0, 0, 50)
@@ -361,10 +382,8 @@ class SpaceSnake(Sketch):
             self.snake.head_direction = self.snake.directions["z_forward"]
 
         self.snake.update_snake()
-
-        self.snake.check_status()
         self.check_food_collision()
 
 
-test = SpaceSnake(GRID_NUM)
+test = SpaceSnake()
 test.run_sketch()
