@@ -138,54 +138,26 @@ class SpaceSnake(Sketch):
         camera = self.camera()
 
     def draw(self):
+        c_green_25 = self.color(0, 255, 0, 25)
+        c_green_50 = self.color(200, 255, 0, 50)
+        c_red_50 = self.color(255, 0, 0, 50)
+        c_red_25 = self.color(255, 0, 0, 25)
+
         self.background(255)
-        grid_size = self.draw_arena(start_position, ARENA_SIZE, GRID_NUM)
+        self.draw_arena(start_position, ARENA_SIZE, GRID_NUM)
 
-        c_green = self.color(0, 255, 0, 25)
-
-        # Snake
         # Render head
-        self.draw_location_support(self.snake.head, c_green)
+        self.draw_location_support(self.snake.head, c_green_25)
         self.draw_support_lines_head()
-        self.push()
-        self.fill(c_green)
-
-        self.translate(
-            start_position + self.snake.head.x * UNIT_SIZE + UNIT_HALF,
-            start_position + self.snake.head.y * UNIT_SIZE + UNIT_HALF,
-            self.snake.head.z * UNIT_SIZE + UNIT_HALF,
-        )
-
-        self.box(UNIT_SIZE - 2)
-
-        self.pop()
+        self.draw_block(self.snake.head, 45, c_green_25, False)
 
         # Render tail
-        for block in self.snake.tail:
-            self.push()
-            self.translate(
-                start_position + block.x * UNIT_SIZE + UNIT_HALF,
-                start_position + block.y * UNIT_SIZE + UNIT_HALF,
-                block.z * UNIT_SIZE + UNIT_HALF,
-            )
-            self.fill(c_green)
-            self.no_stroke()
-            self.box(UNIT_SIZE - 2)
-            self.pop()
+        for tail_block in self.snake.tail:
+            self.draw_block(tail_block, 45, c_green_50, False)
 
-        # Food
-        self.push()
-        self.translate(
-            start_position + self.food.x * UNIT_SIZE + UNIT_HALF,
-            start_position + self.food.y * UNIT_SIZE + UNIT_HALF,
-            self.food.z * UNIT_SIZE + UNIT_HALF,
-        )
-        c_red = self.color(255, 0, 0, 25)
-        self.fill(c_red)
-        self.box(UNIT_SIZE, UNIT_SIZE, UNIT_SIZE)
-        self.pop()
-
-        self.draw_location_support(self.food, c_red)
+        # Render food
+        self.draw_block(self.food, 45, c_red_50, False)
+        self.draw_location_support(self.food, c_red_25)
 
     def draw_block(self, block, block_size, color, no_strokes):
         self.push()
@@ -204,34 +176,53 @@ class SpaceSnake(Sketch):
 
         self.pop()
 
-    def draw_arena(self, starting_distance, arena_size, grid_num):
-        # Centre point
-        self.stroke_weight(10)
-        self.point(starting_distance, starting_distance, 0)
-
-        self.fill(UNIT_SIZE)
+    def display_info(self, offset):
+        self.push()
+        self.fill(self.color(0, 0, 0))
         self.text_size(32)
         self.text(
-            f"Head: {self.snake.head.as_numpy()}",
-            starting_distance + 20,
-            starting_distance - 20,
+            f"""Head:  x: {self.snake.head.x} y: {self.snake.head.y} z: {self.snake.head.z}
+            """,
+            offset,
+            offset,
             0,
         )
-        if self.snake.length > 1:
-            self.text(
-                f"Tail: {[block.as_numpy() for block in self.snake.tail]}",
-                starting_distance + 20,
-                starting_distance - 55,
-                0,
-            )
 
         self.text(
             f"Alive: {self.snake.status}",
-            starting_distance + 350,
-            starting_distance - 20,
+            offset,
+            offset + UNIT_SIZE * 2,
             0,
         )
 
+        self.text(
+            f"Length: {self.snake.length}",
+            offset,
+            offset + UNIT_SIZE,
+            0,
+        )
+
+        self.text(
+            f"Ate: {self.snake.status}",
+            offset,
+            offset + UNIT_SIZE * 3,
+            0,
+        )
+        # new_location = UNIT_SIZE*3
+        # if self.snake.length > 1:
+        #     for i, block in enumerate(self.snake.tail):
+        #         self.text(
+        #             f"Tail: {[block.as_numpy() for block in self.snake.tail]}",
+        #             offset,
+        #             offset + UNIT_SIZE,
+        #             0,
+        #     )
+        self.pop()
+
+    def draw_arena(self, starting_distance, arena_size, grid_num):
+        # Centre point
+        # self.stroke_weight(10)
+        # self.point(starting_distance, starting_distance, 0)
         min_x = starting_distance
         max_x = starting_distance + arena_size
         min_y = starting_distance
@@ -239,25 +230,25 @@ class SpaceSnake(Sketch):
         min_z = 0
         max_z = arena_size
 
-        self.stroke_weight(3)
-
-        # X axis
-        self.stroke(self.color(*colors["blue"]))
-        self.line(min_x, min_y, min_z, max_x, min_y, min_z)
-        # Y axis
-        self.stroke(self.color(*colors["red"]))
-        self.line(min_x, min_y, min_z, min_x, max_y, min_z)
-
-        self.stroke(self.color(*colors["green"]))
-        self.line(min_x, min_y, min_z, min_x, min_y, max_z)
-
         grid_size = arena_size // grid_num
+
+        self.push()
+        self.stroke_weight(0.5)
+
+        # # X axis
+        # self.stroke(self.color(*colors["blue"]))
+        # self.line(min_x, min_y, min_z, max_x, min_y, min_z)
+        # # Y axis
+        # self.stroke(self.color(*colors["red"]))
+        # self.line(min_x, min_y, min_z, min_x, max_y, min_z)
+
+        # self.stroke(self.color(*colors["green"]))
+        # self.line(min_x, min_y, min_z, min_x, min_y, max_z)
 
         grids_xy = np.linspace(min_x, max_x, grid_num + 1)
         grids_z = np.linspace(min_z, max_z, grid_num + 1)
 
         # Y plane
-        self.stroke_weight(1)
         self.stroke(200)
         for y in grids_xy:
             self.line(min_x, y, min_z, max_x, y, min_z)
@@ -279,7 +270,9 @@ class SpaceSnake(Sketch):
         for z in grids_z:
             self.line(min_x, max_y, z, max_x, max_y, z)
 
-        return grid_size
+        self.pop()
+
+        self.display_info(start_position - 250)
 
     def draw_support_lines_head(self):
         self.push()
@@ -319,6 +312,7 @@ class SpaceSnake(Sketch):
             start_position + block.y * UNIT_SIZE + UNIT_HALF,
             0,
         )
+        self.no_stroke()
         self.box(UNIT_SIZE, UNIT_SIZE, 0)
         self.pop()
 
@@ -328,6 +322,7 @@ class SpaceSnake(Sketch):
             start_position + ARENA_SIZE,
             block.z * UNIT_SIZE + UNIT_HALF,
         )
+        self.no_stroke()
         self.box(UNIT_SIZE, 0, UNIT_SIZE)
         self.pop()
 
@@ -337,6 +332,7 @@ class SpaceSnake(Sketch):
             start_position + block.y * UNIT_SIZE + UNIT_HALF,
             block.z * UNIT_SIZE + UNIT_HALF,
         )
+        self.no_stroke()
         self.box(0, UNIT_SIZE, UNIT_SIZE)
         self.pop()
 
