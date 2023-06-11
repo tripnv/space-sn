@@ -18,10 +18,22 @@ class Block:
     def as_list(self) -> list:
         return [self.x, self.y, self.z]
 
+    def __eq__(self, other: object) -> bool:
+        if not isinstance(other, Block):
+            raise ValueError
+        return (self.x, self.y, self.z) == (other.x, other.y, other.z)
+
+    def __repr__(self) -> str:
+        return "%s %s %s" % (self.x, self.y, self.z)
+
     def update(self, new_coordinates: np.array) -> None:
         self.x = new_coordinates[0]
         self.y = new_coordinates[1]
         self.z = new_coordinates[2]
+
+
+# %%
+Block(1, 2, 3) is Block(1, 2, 3)
 
 
 # %%
@@ -181,7 +193,7 @@ class SpaceSnake(Sketch):
         self.fill(self.color(0, 0, 0))
         self.text_size(32)
         self.text(
-            f"""Head:  x: {self.snake.head.x} y: {self.snake.head.y} z: {self.snake.head.z}
+            f"""Head: {self.snake.head.__repr__()}
             """,
             offset,
             offset,
@@ -208,15 +220,7 @@ class SpaceSnake(Sketch):
             offset + UNIT_SIZE * 3,
             0,
         )
-        # new_location = UNIT_SIZE*3
-        # if self.snake.length > 1:
-        #     for i, block in enumerate(self.snake.tail):
-        #         self.text(
-        #             f"Tail: {[block.as_numpy() for block in self.snake.tail]}",
-        #             offset,
-        #             offset + UNIT_SIZE,
-        #             0,
-        #     )
+
         self.pop()
 
     def draw_arena(self, starting_distance, arena_size, grid_num):
