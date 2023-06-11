@@ -2,6 +2,7 @@
 import numpy as np
 from py5 import Sketch
 from itertools import product
+from random import choice
 
 
 # %%
@@ -18,6 +19,9 @@ class Block:
     def as_list(self) -> list:
         return [self.x, self.y, self.z]
 
+    def as_tuple(self):
+        return (self.x, self.y, self.z)
+
     def __eq__(self, other: object) -> bool:
         if not isinstance(other, Block):
             raise ValueError
@@ -33,7 +37,6 @@ class Block:
 
 
 # %%
-Block(1, 2, 3) is Block(1, 2, 3)
 
 
 # %%
@@ -117,6 +120,7 @@ UNIT_HALF = UNIT_SIZE // 2
 ARENA_SIZE = GRID_NUM * UNIT_SIZE
 
 start_position = middle_y
+POSSIBLE_COORDINATES = set(product(range(GRID_NUM), repeat=3))
 
 
 # %%
@@ -135,18 +139,27 @@ class SpaceSnake(Sketch):
         self.update_space_representation()
         self.food = self.generate_empty_block()
 
+    # def generate_empty_block(self):
+    #     """Given a 3d board representation return the coordinates of the empty block"""
+
+    #     empty_positions = np.where(self.space_representation == 0)
+    #     num_candidate_positions = empty_positions[0].shape[0]
+
+    #     random_index = np.random.choice(num_candidate_positions, 1)
+
+    #     empty_block = Block(
+    #         x=empty_positions[0][random_index],
+    #         y=empty_positions[1][random_index],
+    #         z=empty_positions[2][random_index],
+    #     )
+    #     return empty_block
+
     def generate_empty_block(self):
-        """Given a 3d board representation return the coordinates of the empty block"""
-        empty_positions = np.where(self.space_representation == 0)
-        num_candidate_positions = empty_positions[0].shape[0]
+        tail_set = set([block.as_tuple() for block in self.snake.tail])
+        tail_set.add(self.snake.head.as_tuple())
+        empty = choice(list(POSSIBLE_COORDINATES.difference(tail_set)))
+        empty_block = Block(empty[0], empty[1], empty[2])
 
-        random_index = np.random.choice(num_candidate_positions, 1)
-
-        empty_block = Block(
-            x=empty_positions[0][random_index],
-            y=empty_positions[1][random_index],
-            z=empty_positions[2][random_index],
-        )
         return empty_block
 
     def update_space_representation(self):
