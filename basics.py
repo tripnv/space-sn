@@ -3,6 +3,7 @@ import numpy as np
 from py5 import Sketch
 from itertools import product
 from random import choice
+from collections import deque
 
 
 # %%
@@ -56,12 +57,15 @@ class Snake:
             np.random.choice(list(self.directions.keys()))
         ]
         self.status = True  # Alive status
-        self.state = 0  # Ate
+        self.state = 0  #
         self.length = 1
         self.tail = []
 
-    def has_eaten(self):
-        self.state = 1
+    # def has_eaten(self):
+    #     self.state = 1
+
+    def assign_direction(self, action):
+        self.head_direction = action
 
     def update_snake(self):
         head_previous_position = Block(self.head.x, self.head.y, self.head.z)
@@ -90,11 +94,6 @@ class Snake:
         if not ((0 <= head_coordinates) & (head_coordinates < GRID_NUM)).all():
             self.status = False
 
-        # Self-bite check ??
-        # Hesitating about the case when it's right behind itself
-        # Check probably needs to be split
-        # Self bite check before update, oob after update
-
     def check_self_collision(self):
         collision = False
         if self.length > 1:
@@ -106,6 +105,37 @@ class Snake:
                 tail_idx += 1
 
 
+def create_adjacency_dict(units_across_dim):
+    space = list(product(range(units_across_dim), repeat=3))
+    adjacency_dict = {pos: [] for pos in space}
+    for pos in space:
+        x, y, z = pos
+
+        subset = []
+        for i in [-1, 1]:
+            subset.append((x + i, y, z))
+            subset.append((x, y + i, z))
+            subset.append((x, y, z + 1))
+
+        for coords in subset:
+            # Check validity
+            x_, y_, z_ = coords
+            if (
+                (x_ >= 0)
+                and (y_ >= 0)
+                and (z_ >= 0)
+                and (x_ < units_across_dim)
+                and (y_ < units_across_dim)
+                and (z_ < units_across_dim)
+            ):
+                if coords not in adjacency_dict[pos]:
+                    adjacency_dict[pos].append(coords)
+                if pos not in adjacency_dict[coords]:
+                    adjacency_dict[coords].append(pos)
+
+    return adjacency_dict
+
+
 screen_height = 1914
 screen_width = 2104
 
@@ -115,16 +145,16 @@ colors = {"red": (255, 0, 0), "green": (0, 255, 0), "blue": (0, 0, 255)}
 
 GRID_NUM = 10
 UNIT_SIZE = 50
-# Since for the render is based on the center of the box
 UNIT_HALF = UNIT_SIZE // 2
 ARENA_SIZE = GRID_NUM * UNIT_SIZE
 
 start_position = middle_y
 POSSIBLE_COORDINATES = set(product(range(GRID_NUM), repeat=3))
+ADJACENT_COORDS = create_adjacency_dict(GRID_NUM)
 
 
 # %%
-class SpaceSnake(Sketch):
+class Environment(Sketch):
     def __init__(self) -> None:
         super().__init__()
         self.space_representation = np.zeros((GRID_NUM, GRID_NUM, GRID_NUM))
@@ -138,21 +168,6 @@ class SpaceSnake(Sketch):
         # self.update_space_representation()
         self.food = self.generate_empty_block()
 
-    # def generate_empty_block(self):
-    #     """Given a 3d board representation return the coordinates of the empty block"""
-
-    #     empty_positions = np.where(self.space_representation == 0)
-    #     num_candidate_positions = empty_positions[0].shape[0]
-
-    #     random_index = np.random.choice(num_candidate_positions, 1)
-
-    #     empty_block = Block(
-    #         x=empty_positions[0][random_index],
-    #         y=empty_positions[1][random_index],
-    #         z=empty_positions[2][random_index],
-    #     )
-    #     return empty_block
-
     def generate_empty_block(self):
         if self.snake.tail:
             tail_set = set([block.as_tuple() for block in self.snake.tail])
@@ -164,13 +179,14 @@ class SpaceSnake(Sketch):
 
         return empty_block
 
-    def step(self):
+    def step(self, action):
+        self.snake.assign_direction(action)
         self.snake.update_snake()
         self.check_food_collision()
 
     def check_food_collision(self):
         if self.snake.head.__eq__(self.food):
-            self.snake.has_eaten()
+            self.snake.state = 1  # Signaling that the snake ate an apple
             self.food = self.generate_empty_block()
 
     def settings(self):
@@ -185,7 +201,8 @@ class SpaceSnake(Sketch):
     def draw(self):
         if self.snake.status == False:
             self.reset()
-            # print("Died")
+        if self.frame_count % 15 == 0:
+            self.step(self.snake.head_direction)
         c_green_25 = self.color(0, 255, 0, 25)
         c_green_50 = self.color(200, 255, 0, 50)
         c_red_50 = self.color(255, 0, 0, 50)
@@ -281,7 +298,7 @@ class SpaceSnake(Sketch):
         # # Y axis
         # self.stroke(self.color(*colors["red"]))
         # self.line(min_x, min_y, min_z, min_x, max_y, min_z)
-
+        # # Z axis
         # self.stroke(self.color(*colors["green"]))
         # self.line(min_x, min_y, min_z, min_x, min_y, max_z)
 
@@ -378,26 +395,47 @@ class SpaceSnake(Sketch):
 
     def key_pressed(self):
         if self.key_code == self.UP:
-            # block.y -= UNIT_SIZE
             self.snake.head_direction = self.snake.directions["y_up"]
         elif self.key_code == self.DOWN:
-            # block.y += UNIT_SIZE
             self.snake.head_direction = self.snake.directions["y_down"]
         elif self.key_code == self.LEFT:
-            # block.x -= UNIT_SIZE
             self.snake.head_direction = self.snake.directions["x_left"]
         elif self.key_code == self.RIGHT:
-            # block.x += UNIT_SIZE
             self.snake.head_direction = self.snake.directions["x_right"]
         elif self.key == "w":
-            # block.z -= UNIT_SIZE
             self.snake.head_direction = self.snake.directions["z_backward"]
         elif self.key == "s":
-            # block.z += UNIT_SIZE
             self.snake.head_direction = self.snake.directions["z_forward"]
 
-        self.step()
+    def bfs(self, start_position, target_position):
+        initial_position = Node(start_position.as_tuple())
+
+        if initial_position.__eq__():
+            ...
 
 
-test = SpaceSnake()
+# %%
+class Node:
+    def __init__(self, position: tuple, parent=None, action=None, path_cost=0) -> None:
+        self.position = position
+        self.parent = parent
+        self.action = action
+        self.depth = path_cost
+        if self.parent:
+            self.depth += 1
+
+    def __repr__(self) -> str:
+        return f"N - {self.position}"
+
+    def __eq__(self, __value) -> bool:
+        return isinstance(__value, Node) and self.state == __value.state
+
+    def __hash__(self):
+        return hash(self.state)
+
+
+# %%
+
+
+test = Environment()
 test.run_sketch()
