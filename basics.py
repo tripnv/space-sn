@@ -1,4 +1,5 @@
 # %%
+from typing import List
 from search import Node, ADJACENCY_DICT
 import numpy as np
 from py5 import Sketch
@@ -145,7 +146,9 @@ screen_width = 2104
 
 middle_y = 1914 // 2
 
-colors = {"red": (255, 0, 0), "green": (0, 255, 0), "blue": (0, 0, 255)}
+# colors = {"red": (255, 0, 0), "green": (0, 255, 0), "blue": (0, 0, 255)}
+FRAME_RATE = 30
+FRAME_COUNT_DIVISOR = 15
 
 GRID_NUM = 10
 UNIT_SIZE = 50
@@ -159,14 +162,14 @@ POSSIBLE_COORDINATES = set(product(range(GRID_NUM), repeat=3))
 
 # %%
 class Environment(Sketch):
-    def __init__(self) -> None:
+    def __init__(self, agent=None) -> None:
         super().__init__()
         self.space_representation = np.zeros((GRID_NUM, GRID_NUM, GRID_NUM))
         # self.snake = Snake(self.generate_empty_block())
         self.snake = Snake(Block(5, 5, 5))
         self.food = self.generate_empty_block()
         self.action_queue = []
-        self.agent = None
+        self.agent = agent
 
     def reset(self):
         self.space_representation = np.zeros((GRID_NUM, GRID_NUM, GRID_NUM))
@@ -180,8 +183,10 @@ class Environment(Sketch):
             tail_set.add(self.snake.head.as_tuple())
         else:
             tail_set = set(self.snake.head.as_tuple())
-        empty = choice(list(POSSIBLE_COORDINATES.difference(tail_set)))
-        empty_block = Block(empty[0], empty[1], empty[2])
+        empty_x, empty_y, empty_z = choice(
+            list(POSSIBLE_COORDINATES.difference(tail_set))
+        )
+        empty_block = Block(empty_x, empty_y, empty_z)
 
         return empty_block
 
@@ -190,32 +195,50 @@ class Environment(Sketch):
         self.snake.update_snake()
         self.check_food_collision()
 
+    def select_direction(self):
+        if self.agent:
+            if self.action_queue:
+                action = self.action_queue.popleft()
+                self.step(action)
+            else:
+                self.action_queue = self.agent.generate_path(
+                    self.snake.head.as_tuple(),
+                    self.food.as_tuple(),
+                    self.snake.snake_blocks_as_list(),
+                )
+
+        else:
+            if self.frame_count % FRAME_COUNT_DIVISOR == 0:
+                self.step(self.snake.head_direction)
+
     def check_food_collision(self):
         if self.snake.head.__eq__(self.food):
             self.snake.state = 1  # Signaling that the snake ate an apple
             self.food = self.generate_empty_block()
+
+    def headless_run(self):
+        while self.snake.status:
+            self.select_direction()
+
+        return self.snake.length
 
     def settings(self):
         self.size(1914, 2104, self.P3D)
         self.smooth(4)
 
     def setup(self):
-        self.frame_rate(60)
+        if self.agent:
+            self.frame_rate(FRAME_RATE)
+        else:
+            self.frame_rate(30)
         self.rect_mode(2)
         camera = self.camera()
 
     def draw(self):
         if self.snake.status == False:
             self.reset()
-        if self.frame_count:
-            if self.action_queue:
-                action = self.action_queue.popleft()
-                self.step(action)
-            else:
-                search_final_node = self.bfs(
-                    self.snake.head.as_tuple(), self.food.as_tuple()
-                )
-                self.action_queue = self.unwrap_path(search_final_node)
+
+        self.select_direction()
 
         c_green_25 = self.color(0, 255, 0, 25)
         c_green_50 = self.color(200, 255, 0, 50)
@@ -421,26 +444,71 @@ class Environment(Sketch):
         elif self.key == "s":
             self.snake.head_direction = self.snake.directions["z_forward"]
 
+
+class Agent:
+    def __init__(self, search_algorithm: str) -> None:
+        self.search_algorithm = search_algorithm
+
+    def position_occupied(self, node):
+        for block in self.occupied_positions:
+            if block.__eq__(node):
+                return True
+        return False
+
+    def invalid_position(self, node):
+        x, y, z = node.position
+        if x < 0 or x > GRID_NUM - 1:
+            return True
+        if y < 0 or y > GRID_NUM - 1:
+            return True
+        if z < 0 or z > GRID_NUM - 1:
+            return True
+        return False
+
+    def generate_path(
+        self,
+        start_position: tuple,
+        end_position: tuple,
+        occupied_positions: List[tuple],
+    ):
+        """Generate the sequence of actions that connect the start position to the end position such that the occupied squares are avoided."""
+        self.occupied_positions = [Node(block) for block in occupied_positions]
+
+        # Sceanrio 1
+        if self.search_algorithm == "BFS":
+            search_final_node = self.bfs(start_position, end_position)
+
+        elif self.search_algorithm == "DFS":
+            raise NotImplementedError
+
+        elif self.search_algorithm == "A*":
+            raise NotImplementedError
+
+        else:
+            raise NotImplementedError
+
+        if not search_final_node:
+            search_final_node = self.select_random_available_position(start_position)
+
+        return self.unwrap_path(search_final_node)
+
+    def select_random_available_position(self, start_position):
+        """Not exactly random, but return the first available child node"""
+        node = Node(start_position)
+        for child_position in ADJACENCY_DICT[node.position]:
+            child_node = Node(child_position, parent=node)
+            if not self.position_occupied(child_node):
+                child_node.add_action()
+                return child_node
+
+        # Case for no available positions; basically, killing the snake
+        child_node = Node(ADJACENCY_DICT[node.position][0], parent=node)
+        return child_node
+
     def bfs(self, start_position, end_position):
+        """"""
         node = Node(start_position)
         goal = Node(end_position)
-        occupied_blocks = [Node(block) for block in self.snake.snake_blocks_as_list()]
-
-        def position_occupied(node, occupied_blocks):
-            for block in occupied_blocks:
-                if block.__eq__(node):
-                    return True
-            return False
-
-        def invalid_position(node):
-            x, y, z = node.position
-            if x < 0 or x > GRID_NUM - 1:
-                return True
-            if y < 0 or y > GRID_NUM - 1:
-                return True
-            if z < 0 or z > GRID_NUM - 1:
-                return True
-            return False
 
         # Test goal state
         if goal.__eq__(node):
@@ -457,8 +525,8 @@ class Environment(Sketch):
                 # print(child_position)
                 child_node = Node(child_position, parent=node)
                 if (
-                    not position_occupied(child_node, occupied_blocks)
-                    and not invalid_position(child_node)
+                    not self.position_occupied(child_node)
+                    and not self.invalid_position(child_node)
                     and child_node not in explored
                     and child_node not in frontier
                 ):
@@ -478,23 +546,10 @@ class Environment(Sketch):
         return action_queue
 
 
-# env = Environment()
-# # %%
-# # %%
-# res = env.bfs((1, 1, 1), (6, 5, 5))
-# # %%
-# action_q = env.unwrap_path(res)
-
-# # %%
-# action = action_q.popleft()
-# action
-# # %%
-# action_q
-# # %%
-
-# #
+# %%
+agent = Agent("BFS")
+environment = Environment(agent)
 
 
 # %%
-test = Environment()
-test.run_sketch()
+environment.run_sketch()
