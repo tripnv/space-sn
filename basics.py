@@ -1,4 +1,5 @@
 # %%
+from search import Node, ADJACENCY_DICT
 import numpy as np
 from py5 import Sketch
 from itertools import product
@@ -20,7 +21,7 @@ class Block:
     def as_list(self) -> list:
         return [self.x, self.y, self.z]
 
-    def as_tuple(self):
+    def as_tuple(self) -> tuple:
         return (self.x, self.y, self.z)
 
     def __eq__(self, other: object) -> bool:
@@ -61,8 +62,11 @@ class Snake:
         self.length = 1
         self.tail = []
 
-    # def has_eaten(self):
-    #     self.state = 1
+    def snake_blocks_as_list(self):
+        if self.tail:
+            return [self.head.as_tuple(), *[block.as_tuple() for block in self.tail]]
+        else:
+            return [self.head.as_tuple()]
 
     def assign_direction(self, action):
         self.head_direction = action
@@ -105,35 +109,35 @@ class Snake:
                 tail_idx += 1
 
 
-def create_adjacency_dict(units_across_dim):
-    space = list(product(range(units_across_dim), repeat=3))
-    adjacency_dict = {pos: [] for pos in space}
-    for pos in space:
-        x, y, z = pos
+# def create_adjacency_dict(units_across_dim):
+#     space = list(product(range(units_across_dim), repeat=3))
+#     adjacency_dict = {pos: [] for pos in space}
+#     for pos in space:
+#         x, y, z = pos
 
-        subset = []
-        for i in [-1, 1]:
-            subset.append((x + i, y, z))
-            subset.append((x, y + i, z))
-            subset.append((x, y, z + 1))
+#         subset = []
+#         for i in [-1, 1]:
+#             subset.append((x + i, y, z))
+#             subset.append((x, y + i, z))
+#             subset.append((x, y, z + 1))
 
-        for coords in subset:
-            # Check validity
-            x_, y_, z_ = coords
-            if (
-                (x_ >= 0)
-                and (y_ >= 0)
-                and (z_ >= 0)
-                and (x_ < units_across_dim)
-                and (y_ < units_across_dim)
-                and (z_ < units_across_dim)
-            ):
-                if coords not in adjacency_dict[pos]:
-                    adjacency_dict[pos].append(coords)
-                if pos not in adjacency_dict[coords]:
-                    adjacency_dict[coords].append(pos)
+#         for coords in subset:
+#             # Check validity
+#             x_, y_, z_ = coords
+#             if (
+#                 (x_ >= 0)
+#                 and (y_ >= 0)
+#                 and (z_ >= 0)
+#                 and (x_ < units_across_dim)
+#                 and (y_ < units_across_dim)
+#                 and (z_ < units_across_dim)
+#             ):
+#                 if coords not in adjacency_dict[pos]:
+#                     adjacency_dict[pos].append(coords)
+#                 if pos not in adjacency_dict[coords]:
+#                     adjacency_dict[coords].append(pos)
 
-    return adjacency_dict
+#     return adjacency_dict
 
 
 screen_height = 1914
@@ -150,7 +154,7 @@ ARENA_SIZE = GRID_NUM * UNIT_SIZE
 
 start_position = middle_y
 POSSIBLE_COORDINATES = set(product(range(GRID_NUM), repeat=3))
-ADJACENT_COORDS = create_adjacency_dict(GRID_NUM)
+# ADJACENT_COORDS = create_adjacency_dict(GRID_NUM)
 
 
 # %%
@@ -161,6 +165,8 @@ class Environment(Sketch):
         # self.snake = Snake(self.generate_empty_block())
         self.snake = Snake(Block(5, 5, 5))
         self.food = self.generate_empty_block()
+        self.action_queue = []
+        self.agent = None
 
     def reset(self):
         self.space_representation = np.zeros((GRID_NUM, GRID_NUM, GRID_NUM))
@@ -201,8 +207,16 @@ class Environment(Sketch):
     def draw(self):
         if self.snake.status == False:
             self.reset()
-        if self.frame_count % 15 == 0:
-            self.step(self.snake.head_direction)
+        if self.frame_count:
+            if self.action_queue:
+                action = self.action_queue.popleft()
+                self.step(action)
+            else:
+                search_final_node = self.bfs(
+                    self.snake.head.as_tuple(), self.food.as_tuple()
+                )
+                self.action_queue = self.unwrap_path(search_final_node)
+
         c_green_25 = self.color(0, 255, 0, 25)
         c_green_50 = self.color(200, 255, 0, 50)
         c_red_50 = self.color(255, 0, 0, 50)
@@ -407,35 +421,80 @@ class Environment(Sketch):
         elif self.key == "s":
             self.snake.head_direction = self.snake.directions["z_forward"]
 
-    def bfs(self, start_position, target_position):
-        initial_position = Node(start_position.as_tuple())
+    def bfs(self, start_position, end_position):
+        node = Node(start_position)
+        goal = Node(end_position)
+        occupied_blocks = [Node(block) for block in self.snake.snake_blocks_as_list()]
 
-        if initial_position.__eq__():
-            ...
+        def position_occupied(node, occupied_blocks):
+            for block in occupied_blocks:
+                if block.__eq__(node):
+                    return True
+            return False
+
+        def invalid_position(node):
+            x, y, z = node.position
+            if x < 0 or x > GRID_NUM - 1:
+                return True
+            if y < 0 or y > GRID_NUM - 1:
+                return True
+            if z < 0 or z > GRID_NUM - 1:
+                return True
+            return False
+
+        # Test goal state
+        if goal.__eq__(node):
+            return node
+
+        frontier = deque([node])
+        explored = set()
+        while frontier:
+            node = frontier.popleft()
+            explored.add(node)
+
+            # Nodes that are reachable in one step
+            for child_position in ADJACENCY_DICT[node.position]:
+                # print(child_position)
+                child_node = Node(child_position, parent=node)
+                if (
+                    not position_occupied(child_node, occupied_blocks)
+                    and not invalid_position(child_node)
+                    and child_node not in explored
+                    and child_node not in frontier
+                ):
+                    child_node.add_action()
+                    # print(child_node)
+                    if goal.__eq__(child_node):
+                        # print(child_node)
+                        return child_node
+                    frontier.append(child_node)
+        return None
+
+    def unwrap_path(self, node):
+        action_queue = deque()
+        while node.parent:
+            action_queue.appendleft(node.action)
+            node = node.parent
+        return action_queue
+
+
+# env = Environment()
+# # %%
+# # %%
+# res = env.bfs((1, 1, 1), (6, 5, 5))
+# # %%
+# action_q = env.unwrap_path(res)
+
+# # %%
+# action = action_q.popleft()
+# action
+# # %%
+# action_q
+# # %%
+
+# #
 
 
 # %%
-class Node:
-    def __init__(self, position: tuple, parent=None, action=None, path_cost=0) -> None:
-        self.position = position
-        self.parent = parent
-        self.action = action
-        self.depth = path_cost
-        if self.parent:
-            self.depth += 1
-
-    def __repr__(self) -> str:
-        return f"N - {self.position}"
-
-    def __eq__(self, __value) -> bool:
-        return isinstance(__value, Node) and self.state == __value.state
-
-    def __hash__(self):
-        return hash(self.state)
-
-
-# %%
-
-
 test = Environment()
 test.run_sketch()
