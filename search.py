@@ -101,7 +101,7 @@ class Agent:
         return child_node
 
     def bfs(self, start_position, end_position):
-        """"""
+        """Breadth first search"""
         node = Node(start_position)
         goal = Node(end_position)
 
@@ -131,7 +131,7 @@ class Agent:
         return None
 
     def dfs(self, start_position, end_position):
-        """"""
+        """Depth first search"""
         node = Node(start_position)
         goal = Node(end_position)
 
@@ -160,6 +160,7 @@ class Agent:
         return None
 
     def unwrap_path(self, node):
+        """Given a result node, generate a list of actions that connects"""
         action_queue = deque()
         while node.parent:
             action_queue.appendleft(node.action)
@@ -168,7 +169,7 @@ class Agent:
 
 
 ADJACENCY_DICT = {key: [] for key in product(range(GRID_NUM), repeat=3)}
-
+# More structured adjacency dict creation, meaning that the adjacent positions are ordered
 for pos, content in ADJACENCY_DICT.items():
     content.append(tuple(map(lambda i, j: i - j, pos, (1, 0, 0))))
     content.append(tuple(map(lambda i, j: i - j, pos, (-1, 0, 0))))
