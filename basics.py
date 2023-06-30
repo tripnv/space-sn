@@ -112,7 +112,7 @@ screen_width = 2104
 middle_y = 1914 // 2
 
 # colors = {"red": (255, 0, 0), "green": (0, 255, 0), "blue": (0, 0, 255)}
-FRAME_RATE = 60
+FRAME_RATE = 120
 FRAME_COUNT_DIVISOR = 15
 
 GRID_NUM = 10
@@ -411,9 +411,12 @@ class Environment(Sketch):
 
 
 # %%
-agent = Agent("BFS")
+agent = Agent("DFS")
 environment = Environment(agent)
 
 
 # %%
 environment.run_sketch()
+# %%
+# score = environment.headless_run()
+# print(score)

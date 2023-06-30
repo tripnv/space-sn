@@ -70,8 +70,11 @@ class Agent:
             search_final_node = self.bfs(start_position, end_position)
 
         elif self.search_algorithm == "DFS":
-            raise NotImplementedError
-
+            search_final_node = self.dfs(start_position, end_position)
+            if search_final_node == None:
+                search_final_node = self.dfs(
+                    start_position, self.occupied_positions[-1]
+                )
         elif self.search_algorithm == "A*":
             raise NotImplementedError
 
@@ -79,9 +82,7 @@ class Agent:
             raise NotImplementedError
 
         if search_final_node == None:
-            print("Im here")
             search_final_node = self.select_available_position(start_position)
-            print(search_final_node)
 
         return self.unwrap_path(search_final_node)
 
@@ -116,7 +117,6 @@ class Agent:
 
             # Nodes that are reachable in one step
             for child_position in ADJACENCY_DICT[node.position]:
-                # print(child_position)
                 child_node = Node(child_position, parent=node)
                 if (
                     not self.position_occupied(child_node)
@@ -125,10 +125,37 @@ class Agent:
                     and child_node not in frontier
                 ):
                     child_node.add_action()
-                    # print(child_node)
                     if goal.__eq__(child_node):
-                        # print(child_node)
                         return child_node
+                    frontier.append(child_node)
+        return None
+
+    def dfs(self, start_position, end_position):
+        """"""
+        node = Node(start_position)
+        goal = Node(end_position)
+
+        if goal.__eq__(node):
+            return node
+        frontier = [node]
+        explored = set()
+        while frontier:
+            node = frontier.pop()
+
+            if goal.__eq__(node):
+                return node
+
+            explored.add(node)
+
+            for child_position in ADJACENCY_DICT[node.position]:
+                child_node = Node(child_position, parent=node)
+                if (
+                    not self.position_occupied(child_node)
+                    and not self.invalid_position(child_node)
+                    and child_node not in explored
+                    and child_node not in frontier
+                ):
+                    child_node.add_action()
                     frontier.append(child_node)
         return None
 
@@ -140,7 +167,7 @@ class Agent:
         return action_queue
 
 
-ADJACENCY_DICT = {key: [] for key in product(range(10), repeat=3)}
+ADJACENCY_DICT = {key: [] for key in product(range(GRID_NUM), repeat=3)}
 
 for pos, content in ADJACENCY_DICT.items():
     content.append(tuple(map(lambda i, j: i - j, pos, (1, 0, 0))))
