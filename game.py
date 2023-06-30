@@ -8,7 +8,7 @@ from random import choice
 from collections import deque
 
 
-# Basic building block
+# Basic building block for rendering
 class Block:
     def __init__(self, x, y, z) -> None:
         self.x = x
@@ -51,24 +51,31 @@ class Snake:
 
     def __init__(self, initial_block) -> None:
         self.head = initial_block
-        self.head_direction = self.directions[
+        self.head_direction: tuple = self.directions[
             np.random.choice(list(self.directions.keys()))
         ]
-        self.status = True  # Alive status
-        self.state = 0  #
-        self.length = 1
-        self.tail = []
+        # Alive status
+        self.status: bool = True
+        # Signaling eating
+        self.state: bool = 0
+        # Snake length
+        self.length: int = 1
+        # List of snake blocks
+        self.tail: List[Block] = []
 
-    def snake_blocks_as_list(self):
+    def snake_blocks_as_list(self) -> List[tuple]:
+        """Return a List[tuples] representation of the snake"""
         if self.tail:
             return [self.head.as_tuple(), *[block.as_tuple() for block in self.tail]]
         else:
             return [self.head.as_tuple()]
 
-    def assign_direction(self, action):
+    def assign_direction(self, action: tuple) -> None:
+        """Given an action, set the direction of the snake head"""
         self.head_direction = action
 
-    def update_snake(self):
+    def update_snake(self) -> None:
+        """Update the head and tail block coordinates based on the head direction"""
         head_previous_position = Block(self.head.x, self.head.y, self.head.z)
         self.head.update(self.head.as_numpy() + self.head_direction)
         if self.length > 1:
@@ -89,13 +96,14 @@ class Snake:
         self.check_self_collision()
         self.check_out_of_bounds()
 
-    def check_out_of_bounds(self):
-        # Out of bounds check
+    def check_out_of_bounds(self) -> None:
+        """Out of bounds check"""
         head_coordinates = self.head.as_numpy()
         if not ((0 <= head_coordinates) & (head_coordinates < GRID_NUM)).all():
             self.status = False
 
-    def check_self_collision(self):
+    def check_self_collision(self) -> None:
+        """Check if the updated snake head coordinates coincide with one of the tail blocks"""
         collision = False
         if self.length > 1:
             tail_len = self.length - 1
@@ -112,14 +120,15 @@ screen_width = 2104
 middle_y = 1914 // 2
 
 # colors = {"red": (255, 0, 0), "green": (0, 255, 0), "blue": (0, 0, 255)}
-FRAME_RATE = 30
+FRAME_RATE = 60
 FRAME_COUNT_DIVISOR = 15
 
 GRID_NUM = 10
 UNIT_SIZE = 50
+RENDER_UNIT_SIZE = 45
 UNIT_HALF = UNIT_SIZE // 2
 ARENA_SIZE = GRID_NUM * UNIT_SIZE
-
+BLOCK_STROKE = False
 start_position = middle_y
 POSSIBLE_COORDINATES = set(product(range(GRID_NUM), repeat=3))
 # ADJACENT_COORDS = create_adjacency_dict(GRID_NUM)
@@ -129,18 +138,24 @@ POSSIBLE_COORDINATES = set(product(range(GRID_NUM), repeat=3))
 class Environment(Sketch):
     def __init__(self, agent=None) -> None:
         super().__init__()
-        self.space_representation = np.zeros((GRID_NUM, GRID_NUM, GRID_NUM))
+        # self.space_representation = np.zeros((GRID_NUM, GRID_NUM, GRID_NUM))
         # self.snake = Snake(self.generate_empty_block())
+
+        # Initialize snake
         self.snake = Snake(Block(5, 5, 5))
+        # Initialize food
         self.food = self.generate_empty_block()
+        #
         self.action_queue = []
+        # Initialize autonomous agent
         self.agent = agent
 
+        # Logging metrics
         self.max_sl = 0
         self.min_sl = 100
 
     def reset(self):
-        self.space_representation = np.zeros((GRID_NUM, GRID_NUM, GRID_NUM))
+        # self.space_representation = np.zeros((GRID_NUM, GRID_NUM, GRID_NUM))
         self.snake = Snake(Block(5, 5, 5))
         # self.update_space_representation()
         self.food = self.generate_empty_block()
@@ -192,7 +207,7 @@ class Environment(Sketch):
 
     def settings(self):
         self.size(1914, 2104, self.P3D)
-        self.smooth(4)
+        self.smooth(8)
 
     def setup(self):
         if self.agent:
@@ -219,14 +234,14 @@ class Environment(Sketch):
         # Render head
         self.draw_location_support(self.snake.head, c_green_25)
         self.draw_support_lines_head()
-        self.draw_block(self.snake.head, 45, c_green_25, False)
+        self.draw_block(self.snake.head, RENDER_UNIT_SIZE, c_green_25, BLOCK_STROKE)
 
         # Render tail
         for tail_block in self.snake.tail:
-            self.draw_block(tail_block, 45, c_green_50, False)
+            self.draw_block(tail_block, RENDER_UNIT_SIZE, c_green_50, BLOCK_STROKE)
 
         # Render food
-        self.draw_block(self.food, 45, c_red_50, False)
+        self.draw_block(self.food, RENDER_UNIT_SIZE, c_red_50, BLOCK_STROKE)
         self.draw_location_support(self.food, c_red_25)
 
     def draw_block(self, block, block_size, color, no_strokes):
@@ -241,7 +256,7 @@ class Environment(Sketch):
             start_position + block.y * UNIT_SIZE + UNIT_HALF,
             block.z * UNIT_SIZE + UNIT_HALF,
         )
-
+        self.stroke_weight(0.25)
         self.box(block_size)
 
         self.pop()
@@ -414,12 +429,12 @@ class Environment(Sketch):
 
 
 # %%
-agent = Agent("DFS")
-environment = Environment(agent)
+# agent = Agent("BFS")
+# environment = Environment(agent)
 
 
-# %%
-environment.run_sketch()
+# # %%
+# environment.run_sketch()
 # %%
 # score = environment.headless_run()
 # print(score)
