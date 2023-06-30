@@ -112,7 +112,7 @@ screen_width = 2104
 middle_y = 1914 // 2
 
 # colors = {"red": (255, 0, 0), "green": (0, 255, 0), "blue": (0, 0, 255)}
-FRAME_RATE = 120
+FRAME_RATE = 30
 FRAME_COUNT_DIVISOR = 15
 
 GRID_NUM = 10
@@ -135,6 +135,9 @@ class Environment(Sketch):
         self.food = self.generate_empty_block()
         self.action_queue = []
         self.agent = agent
+
+        self.max_sl = 0
+        self.min_sl = 100
 
     def reset(self):
         self.space_representation = np.zeros((GRID_NUM, GRID_NUM, GRID_NUM))
@@ -244,39 +247,39 @@ class Environment(Sketch):
         self.pop()
 
     def display_info(self, offset):
-        self.push()
-        self.fill(self.color(0, 0, 0))
-        self.text_size(32)
-        self.text(
-            f"""Head: {self.snake.head.__repr__()}
-            """,
-            offset,
-            offset,
-            0,
-        )
+        frame_count = self.frame_count
+        snake_length = self.snake.length
+        max_steps_per_length = self.max_sl
+        min_steps_per_length = self.min_sl
+        steps_per_length = frame_count // snake_length
 
-        self.text(
-            f"Alive: {self.snake.status}",
-            offset,
-            offset + UNIT_SIZE * 2,
-            0,
-        )
+        if steps_per_length > max_steps_per_length:
+            self.max_sl = steps_per_length
 
-        self.text(
-            f"Length: {self.snake.length}",
-            offset,
-            offset + UNIT_SIZE,
-            0,
-        )
+        if steps_per_length < min_steps_per_length:
+            self.min_sl = steps_per_length
 
-        self.text(
-            f"Ate: {self.snake.status}",
-            offset,
-            offset + UNIT_SIZE * 3,
-            0,
-        )
+        metrics = {
+            "frame count": frame_count,
+            "snake length": snake_length,
+            "steps/length": steps_per_length,
+            "max s/l": self.max_sl,
+            "min s/l": self.min_sl,
+        }
 
-        self.pop()
+        for i, (text, value) in enumerate(metrics.items()):
+            self.push()
+            self.fill(self.color(0, 0, 0))
+            self.text_size(32)
+            self.text(
+                f"""{text}: {value}
+                """,
+                offset - UNIT_SIZE,
+                offset + i * UNIT_SIZE,
+                0,
+            )
+
+            self.pop()
 
     def draw_arena(self, starting_distance, arena_size, grid_num):
         # Centre point
