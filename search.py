@@ -38,7 +38,7 @@ class Node:
 
 class Agent:
     def __init__(self, search_algorithm: str) -> None:
-        self.search_algorithm = search_algorithm
+        self.agent_type = search_algorithm.upper()
 
     def position_occupied(self, node):
         for block in self.occupied_positions:
