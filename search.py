@@ -37,8 +37,8 @@ class Node:
 
 
 class Agent:
-    def __init__(self, search_algorithm: str) -> None:
-        self.agent_type = search_algorithm.upper()
+    def __init__(self, agent_type: str) -> None:
+        self.agent_type = agent_type.upper()
 
     def position_occupied(self, node):
         for block in self.occupied_positions:
@@ -66,16 +66,16 @@ class Agent:
         self.occupied_positions = [Node(block) for block in occupied_positions]
 
         # Sceanrio 1
-        if self.search_algorithm == "BFS":
+        if self.agent_type == "BFS":
             search_final_node = self.bfs(start_position, end_position)
 
-        elif self.search_algorithm == "DFS":
+        elif self.agent_type == "DFS":
             search_final_node = self.dfs(start_position, end_position)
             if search_final_node == None:
                 search_final_node = self.dfs(
                     start_position, self.occupied_positions[-1]
                 )
-        elif self.search_algorithm == "A*":
+        elif self.agent_type == "A*":
             raise NotImplementedError
 
         else:
