@@ -136,7 +136,7 @@ POSSIBLE_COORDINATES = set(product(range(GRID_NUM), repeat=3))
 
 # %%
 class Environment(Sketch):
-    def __init__(self, agent=None) -> None:
+    def __init__(self, agent: Agent = None, frame_rate: float = 30) -> None:
         super().__init__()
         # self.space_representation = np.zeros((GRID_NUM, GRID_NUM, GRID_NUM))
         # self.snake = Snake(self.generate_empty_block())
@@ -152,6 +152,8 @@ class Environment(Sketch):
 
         # Initialize autonomous agent
         self.agent = agent
+
+        self.frame_rate_ = frame_rate
 
         # Logging metrics
         self.max_sl = 0
@@ -213,8 +215,7 @@ class Environment(Sketch):
         self.smooth(8)
 
     def setup(self):
-        if self.agent.agent_type == "HUMAN":
-            self.frame_rate(30)
+        self.frame_rate(self.frame_rate_)
         self.rect_mode(2)
         camera = self.camera()
 

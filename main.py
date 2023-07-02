@@ -18,15 +18,15 @@ import click
     help="Operation mode",
 )
 @click.option(
-    "--frame-rate", "-fr", type=int, default=60, help="Frame rate for render mode"
+    "--frame-rate", "-fr", type=float, default=60, help="Frame rate for render mode"
 )
 def run(agent, mode, frame_rate):
     agent_ = game.Agent(agent)
-    environment = game.Environment(agent_)
-    environment.frame_rate = frame_rate
+    environment = game.Environment(agent_, frame_rate=frame_rate)
     click.echo(agent)
     if mode == "headless":
-        environment.run_headless()
+        score = environment.run_headless()
+        click.echo(f"{agent_.agent_type} agent scored: {score}")
     elif mode == "render":
         environment.run_sketch()
 
