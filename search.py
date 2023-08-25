@@ -6,6 +6,15 @@ GRID_NUM = 10
 
 
 class Node:
+    """
+    Represents a node with a specific position in a 3D grid.
+
+    :param position: Tuple representing a 3D position in the grid.
+    :param parent: Parent node of the current node.
+    :param action: Action taken to reach this node from its parent.
+    :param path_cost: Cost to reach the node from the start.
+    """
+
     def __init__(self, position: tuple, parent=None, action=None, path_cost=0) -> None:
         self.position = position
         self.parent = parent
@@ -15,21 +24,43 @@ class Node:
             self.depth += 1
 
     def __repr__(self) -> str:
+        """
+        String representation of the Node object.
+
+        :return: String representing the node's position.
+        """
         return f"Node{self.position}"
 
     def __eq__(self, __value) -> bool:
-        """Check whether the position of the Node equals that of another node"""
+        """
+        Check if the position of the Node is equal to that of another node.
+
+        :param __value: The other node to compare against.
+        :return: True if positions are the same, False otherwise.
+        """
         return isinstance(__value, Node) and self.position == __value.position
 
     def expand(self):
-        """List all nodes one step away given the position of the node"""
+        """
+        List all nodes one step away from the current node's position.
+
+        :return: List of adjacent nodes.
+        """
         return [Node(neighbour) for neighbour in ADJACENCY_DICT[self.position]]
 
     def __hash__(self) -> int:
+        """
+        Compute hash of the node based on its position.
+
+        :return: Hash value of the node.
+        """
         return hash(self.position)
 
     def add_action(self) -> None:
-        """Assign action that needs to be taken to get from parent position to child position."""
+        """
+        Assign the action taken to move from the parent node to the current node.
+        Modifies self.action.
+        """
         child_x, child_y, child_z = self.position
         parent_x, parent_y, parent_z = self.parent.position
 
@@ -37,16 +68,34 @@ class Node:
 
 
 class Agent:
+    """
+    Represents an agent capable of pathfinding in a 3D grid.
+
+    :param agent_type: Type of agent (e.g., BFS, DFS, A*).
+    """
+
     def __init__(self, agent_type: str) -> None:
         self.agent_type = agent_type.upper()
 
     def position_occupied(self, node):
+        """
+        Check if a given position is occupied.
+
+        :param node: Node representing the position to check.
+        :return: True if position is occupied, False otherwise.
+        """
         for block in self.occupied_positions:
             if block.__eq__(node):
                 return True
         return False
 
     def invalid_position(self, node):
+        """
+        Check if a given position is invalid (outside of grid limits).
+
+        :param node: Node representing the position to check.
+        :return: True if position is invalid, False otherwise.
+        """
         x, y, z = node.position
         if x < 0 or x > GRID_NUM - 1:
             return True
@@ -56,13 +105,49 @@ class Agent:
             return True
         return False
 
+    def calculate_euclidean_distance(node_a, node_b):
+        """
+        Calculate the Euclidean distance between two nodes in 3D space.
+
+        :param node_a: First node.
+        :param node_b: Second node.
+        :return: Euclidean distance between the two nodes.
+        """
+        x_a, y_a, z_a = node_a.position
+        x_b, y_b, z_b = node_b.position
+
+        distance = ((x_b - x_a) ** 2 + (y_b - y_a) ** 2 + (z_b - z_a) ** 2) ** 0.5
+
+        return distance
+
+    def calculate_manhattan_distance(node_a, node_b):
+        """
+        Calculate the Manhattan distance between two nodes in 3D space.
+
+        :param node_a: First node.
+        :param node_b: Second node.
+        :return: Manhattan distance between the two nodes.
+        """
+        x_a, y_a, z_a = node_a.position
+        x_b, y_b, z_b = node_b.position
+
+        distance = abs(x_b - x_a) + abs(y_b - y_a) + abs(z_b - z_a)
+        return distance
+
     def generate_path(
         self,
         start_position: tuple,
         end_position: tuple,
         occupied_positions: List[tuple],
     ):
-        """Generate the sequence of actions that connect the start position to the end position such that the occupied squares are avoided."""
+        """
+        Generate a sequence of actions from start to end avoiding occupied positions.
+        
+        :param start_position: Starting position tuple.
+        :param end_position: Ending position tuple.
+        :param occupied_positions: List of positions that are occupied.
+        :return: List of actions to move from start to end.
+        """ """Generate the sequence of actions that connect the start position to the end position such that the occupied squares are avoided."""
         self.occupied_positions = [Node(block) for block in occupied_positions]
 
         # Sceanrio 1
@@ -87,7 +172,11 @@ class Agent:
         return self.unwrap_path(search_final_node)
 
     def select_available_position(self, start_position):
-        """Return the first available child node; if no such child has been found select the first adjacent position"""
+        """Return the first available child node; if no such child has been found select the first adjacent position
+
+        :param start_position: Position to start the search from.
+        :return: Available child node closest to the start position.
+        """
         node = Node(start_position)
         for child_position in ADJACENCY_DICT[node.position]:
             child_node = Node(child_position, parent=node)
@@ -101,7 +190,13 @@ class Agent:
         return child_node
 
     def bfs(self, start_position, end_position):
-        """Breadth first search"""
+        """
+        Perform breadth-first search to find a path in the grid.
+
+        :param start_position: Starting position tuple.
+        :param end_position: Ending position tuple.
+        :return: Result node after performing BFS.
+        """
         node = Node(start_position)
         goal = Node(end_position)
 
@@ -131,7 +226,13 @@ class Agent:
         return None
 
     def dfs(self, start_position, end_position):
-        """Depth first search"""
+        """
+        Perform depth-first search to find a path in the grid.
+
+        :param start_position: Starting position tuple.
+        :param end_position: Ending position tuple.
+        :return: Result node after performing DFS.
+        """
         node = Node(start_position)
         goal = Node(end_position)
 
@@ -160,7 +261,12 @@ class Agent:
         return None
 
     def unwrap_path(self, node):
-        """Given a result node, generate a list of actions that connects"""
+        """
+        Extract the path from a result node back to the start.
+
+        :param node: Result node to extract the path from.
+        :return: List of actions to move from the start to the result node.
+        """
         action_queue = deque()
         while node.parent:
             action_queue.appendleft(node.action)
@@ -179,7 +285,7 @@ for pos, content in ADJACENCY_DICT.items():
     content.append(tuple(map(lambda i, j: i - j, pos, (0, 0, -1))))
 
 
-# Alternative adj
+# Alternative adj, order of adjacent positions is not consistent
 # def create_adjacency_dict(units_across_dim):
 #     space = list(product(range(units_across_dim), repeat=3))
 #     adjacency_dict = {pos: [] for pos in space}
