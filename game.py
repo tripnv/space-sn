@@ -10,29 +10,71 @@ from collections import deque
 
 # Basic building block for rendering
 class Block:
+    """
+    Represents a basic block structure with 3D coordinates.
+    """
+
     def __init__(self, x, y, z) -> None:
+        """
+        Initialize a Block object.
+
+        :param x: The x-coordinate of the block.
+        :param y: The y-coordinate of the block.
+        :param z: The z-coordinate of the block.
+        """
         self.x = x
         self.y = y
         self.z = z
 
     def as_numpy(self) -> np.array:
+        """
+        Converts the block's coordinates into a numpy array.
+
+        :return: Numpy array of coordinates [x, y, z].
+        """
         return np.array([self.x, self.y, self.z])
 
     def as_list(self) -> list:
+        """
+        Converts the block's coordinates into a list.
+
+        :return: List of coordinates [x, y, z].
+        """
         return [self.x, self.y, self.z]
 
     def as_tuple(self) -> tuple:
+        """
+        Converts the block's coordinates into a tuple.
+
+        :return: Tuple of coordinates (x, y, z).
+        """
         return (self.x, self.y, self.z)
 
     def __eq__(self, other: object) -> bool:
+        """
+        Checks if the current block's coordinates are equal to another block's coordinates.
+
+        :param other: another Block object.
+        :return: True if coordinates are the same, otherwise False.
+        """
         if not isinstance(other, Block):
             raise ValueError
         return (self.x, self.y, self.z) == (other.x, other.y, other.z)
 
     def __repr__(self) -> str:
+        """
+        Provides a string representation of the block.
+
+        :return: String representation of the block's coordinates "x y z".
+        """
         return "%s %s %s" % (self.x, self.y, self.z)
 
     def update(self, new_coordinates: np.array) -> None:
+        """
+        Updates the block's coordinates using a numpy array.
+
+        :param new_coordinates: A numpy array containing new coordinates [new_x, new_y, new_z].
+        """
         self.x = new_coordinates[0]
         self.y = new_coordinates[1]
         self.z = new_coordinates[2]
@@ -40,6 +82,20 @@ class Block:
 
 # %%
 class Snake:
+
+    """
+    Represents a 3D snake in a game environment, capable of moving in 6 directions.
+
+    Attributes:
+        directions (dict): Dictionary mapping the direction names to their corresponding coordinate shifts.
+        head (Block): The front block of the snake representing its head.
+        head_direction (tuple): Direction in which the snake's head is currently moving.
+        status (bool): Alive status of the snake.
+        state (bool): Signaling the eating state (0 or 1).
+        length (int): Current length of the snake.
+        tail (list[Block]): List of blocks representing the snake's tail.
+    """
+
     directions = dict(
         x_left=(-1, 0, 0),
         x_right=(1, 0, 0),
@@ -50,6 +106,11 @@ class Snake:
     )
 
     def __init__(self, initial_block) -> None:
+        """
+        Initialize the Snake object with an initial block.
+
+        :param initial_block: The initial block representing the snake's head.
+        """
         self.head = initial_block
         self.head_direction: tuple = self.directions[
             np.random.choice(list(self.directions.keys()))
@@ -64,18 +125,27 @@ class Snake:
         self.tail: List[Block] = []
 
     def snake_blocks_as_list(self) -> List[tuple]:
-        """Return a List[tuples] representation of the snake"""
+        """
+        Return the snake blocks as a list of tuples.
+
+        :return: List[tuple] representation of the snake's blocks.
+        """
         if self.tail:
             return [self.head.as_tuple(), *[block.as_tuple() for block in self.tail]]
         else:
             return [self.head.as_tuple()]
 
     def assign_direction(self, action: tuple) -> None:
-        """Given an action, set the direction of the snake head"""
+        """
+        Assign a new direction to the snake head based on the given action.
+
+        :param action: Tuple representing the new direction.
+        """
         self.head_direction = action
 
     def update_snake(self) -> None:
-        """Update the head and tail block coordinates based on the head direction"""
+        """Proceed with an environment step; updates the head and tail block coordinates based on the head direction"""
+
         head_previous_position = Block(self.head.x, self.head.y, self.head.z)
         self.head.update(self.head.as_numpy() + self.head_direction)
         if self.length > 1:
@@ -97,13 +167,19 @@ class Snake:
         self.check_out_of_bounds()
 
     def check_out_of_bounds(self) -> None:
-        """Out of bounds check"""
+        """
+        Check if the snake's head has gone out of the game's grid.
+        If it has, set the snake's status to dead.
+        """
         head_coordinates = self.head.as_numpy()
         if not ((0 <= head_coordinates) & (head_coordinates < GRID_NUM)).all():
             self.status = False
 
     def check_self_collision(self) -> None:
-        """Check if the updated snake head coordinates coincide with one of the tail blocks"""
+        """
+        Check for collision between the updated snake's head and any part of its tail.
+        If there's a collision, set the snake's status to dead.
+        """
         collision = False
         if self.length > 1:
             tail_len = self.length - 1
@@ -136,7 +212,17 @@ POSSIBLE_COORDINATES = set(product(range(GRID_NUM), repeat=3))
 
 # %%
 class Environment(Sketch):
+    """
+    Represents the environment in which the snake operates, handling its movement, food spawning, and interactions.
+    """
+
     def __init__(self, agent: Agent = None, frame_rate: float = 30) -> None:
+        """
+        Initialize the environment with optional agent and frame rate.
+
+        :param agent: An autonomous agent that guides the snake. Default is None.
+        :param frame_rate: The rate at which frames are rendered. Default is 30.
+        """
         super().__init__()
         # self.space_representation = np.zeros((GRID_NUM, GRID_NUM, GRID_NUM))
         # self.snake = Snake(self.generate_empty_block())
@@ -160,12 +246,20 @@ class Environment(Sketch):
         self.min_sl = 100
 
     def reset(self):
+        """
+        Reset the environment to an initial state.
+        """
         # self.space_representation = np.zeros((GRID_NUM, GRID_NUM, GRID_NUM))
         self.snake = Snake(Block(5, 5, 5))
         # self.update_space_representation()
         self.food = self.generate_empty_block()
 
     def generate_empty_block(self):
+        """
+        Generate a block position in the grid that is currently empty.
+
+        :return: Block object representing an empty block in the grid.
+        """
         if self.snake.tail:
             tail_set = set([block.as_tuple() for block in self.snake.tail])
             tail_set.add(self.snake.head.as_tuple())
@@ -179,11 +273,19 @@ class Environment(Sketch):
         return empty_block
 
     def step(self, action):
+        """
+        Execute one step of the environment based on a provided action.
+
+        :param action: Action to be performed by the snake.
+        """
         self.snake.assign_direction(action)
         self.snake.update_snake()
         self.check_food_collision()
 
     def select_direction(self):
+        """
+        Determine and select the direction of the snake based on the agent type (manual or autonomous).
+        """
         if self.agent.agent_type != "HUMAN":
             if self.action_queue:
                 action = self.action_queue.popleft()
@@ -200,26 +302,44 @@ class Environment(Sketch):
                 self.step(self.snake.head_direction)
 
     def check_food_collision(self):
+        """
+        Check if the snake has collided with the food and handle the collision.
+        """
         if self.snake.head.__eq__(self.food):
             self.snake.state = 1  # Signaling that the snake ate an apple
             self.food = self.generate_empty_block()
 
     def run_headless(self):
+        """
+        Execute the snake's movement without rendering the graphical interface.
+
+        :return: Length of the snake after it has stopped moving.
+        """
         while self.snake.status:
             self.select_direction()
 
         return self.snake.length
 
     def settings(self):
+        """
+        Define the visual settings for rendering the environment.
+        """
         self.size(1914, 2104, self.P3D)
         self.smooth(8)
 
     def setup(self):
+        """
+        Set up the environment and initialize the graphical elements.
+        """
+
         self.frame_rate(self.frame_rate_)
         self.rect_mode(2)
         camera = self.camera()
 
     def draw(self):
+        """
+        Render the environment, snake, food, and other graphical elements.
+        """
         if self.snake.status == False:
             self.reset()
 
@@ -247,6 +367,14 @@ class Environment(Sketch):
         self.draw_location_support(self.food, c_red_25)
 
     def draw_block(self, block, block_size, color, no_strokes):
+        """
+        Draw a block at a specific position with specified visuals.
+
+        :param block: Block object to be rendered.
+        :param block_size: Size of the block to be drawn.
+        :param color: Color to fill the block with.
+        :param no_strokes: If True, the block will have no outline.
+        """
         self.push()
         if color:
             self.fill(color)
@@ -264,6 +392,12 @@ class Environment(Sketch):
         self.pop()
 
     def display_info(self, offset):
+        """
+        Display the environment's metrics on the screen.
+
+        :param offset: Positional offset to begin displaying metrics.
+        """
+
         frame_count = self.frame_count
         snake_length = self.snake.length
         max_steps_per_length = self.max_sl
@@ -299,6 +433,14 @@ class Environment(Sketch):
             self.pop()
 
     def draw_arena(self, starting_distance, arena_size, grid_num):
+        """
+        Render the 3D arena grid in which the snake operates.
+
+        :param starting_distance: Distance from origin to render starting point.
+        :param arena_size: Size of the arena.
+        :param grid_num: Number of grid divisions.
+        """
+
         # Centre point
         # self.stroke_weight(10)
         # self.point(starting_distance, starting_distance, 0)
@@ -354,6 +496,9 @@ class Environment(Sketch):
         self.display_info(start_position - 250)
 
     def draw_support_lines_head(self):
+        """
+        Draw supporting visual lines that extend from the snake's head to the arena boundaries.
+        """
         self.push()
         self.line(
             start_position + self.snake.head.x * UNIT_SIZE + UNIT_HALF,
@@ -384,6 +529,13 @@ class Environment(Sketch):
         self.pop()
 
     def draw_location_support(self, block, color):
+        """
+        Draw supporting visuals to highlight a specific block's position.
+        The tiles on the arena margins light up.
+
+        :param block: Block object to be highlighted.
+        :param color: Color to highlight the block with.
+        """
         self.fill(color)
         self.push()
         self.translate(
@@ -416,6 +568,9 @@ class Environment(Sketch):
         self.pop()
 
     def key_pressed(self):
+        """
+        Handle key press events to control the direction of the snake manually.
+        """
         if self.key_code == self.UP:
             self.snake.head_direction = self.snake.directions["y_up"]
         elif self.key_code == self.DOWN:
