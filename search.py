@@ -2,6 +2,7 @@ from itertools import product
 from typing import Any, List
 from collections import deque
 
+
 GRID_NUM = 10
 
 
@@ -12,14 +13,15 @@ class Node:
     :param position: Tuple representing a 3D position in the grid.
     :param parent: Parent node of the current node.
     :param action: Action taken to reach this node from its parent.
-    :param path_cost: Cost to reach the node from the start.
+    :param gx: Distance from a start position
+    :param hx: Distance from an end position
     """
 
-    def __init__(self, position: tuple, parent=None, action=None, path_cost=0) -> None:
+    def __init__(self, position: tuple, parent=None, action=None, gx=0, hx=0) -> None:
         self.position = position
         self.parent = parent
         self.action = action
-        self.depth = path_cost
+        self.depth = 0
         if self.parent:
             self.depth += 1
 
@@ -79,7 +81,8 @@ class Agent:
 
     def position_occupied(self, node):
         """
-        Check if a given position is occupied.
+        Check if a given position is occupied. Basically checking for the grid cubes occupied by the snake itself.
+        In a future version could include obstacles as well.
 
         :param node: Node representing the position to check.
         :return: True if position is occupied, False otherwise.
@@ -105,35 +108,6 @@ class Agent:
             return True
         return False
 
-    def calculate_euclidean_distance(node_a, node_b):
-        """
-        Calculate the Euclidean distance between two nodes in 3D space.
-
-        :param node_a: First node.
-        :param node_b: Second node.
-        :return: Euclidean distance between the two nodes.
-        """
-        x_a, y_a, z_a = node_a.position
-        x_b, y_b, z_b = node_b.position
-
-        distance = ((x_b - x_a) ** 2 + (y_b - y_a) ** 2 + (z_b - z_a) ** 2) ** 0.5
-
-        return distance
-
-    def calculate_manhattan_distance(node_a, node_b):
-        """
-        Calculate the Manhattan distance between two nodes in 3D space.
-
-        :param node_a: First node.
-        :param node_b: Second node.
-        :return: Manhattan distance between the two nodes.
-        """
-        x_a, y_a, z_a = node_a.position
-        x_b, y_b, z_b = node_b.position
-
-        distance = abs(x_b - x_a) + abs(y_b - y_a) + abs(z_b - z_a)
-        return distance
-
     def generate_path(
         self,
         start_position: tuple,
@@ -149,17 +123,20 @@ class Agent:
         :return: List of actions to move from start to end.
         """ """Generate the sequence of actions that connect the start position to the end position such that the occupied squares are avoided."""
         self.occupied_positions = [Node(block) for block in occupied_positions]
-
-        # Sceanrio 1
+        # Agent scenarios
         if self.agent_type == "BFS":
             search_final_node = self.bfs(start_position, end_position)
 
         elif self.agent_type == "DFS":
             search_final_node = self.dfs(start_position, end_position)
-            if search_final_node == None:
-                search_final_node = self.dfs(
-                    start_position, self.occupied_positions[-1]
-                )
+            # if search_final_node == None:
+            #     search_final_node = self.dfs(
+            #         start_position, self.occupied_positions[-1]
+            #     )
+
+        elif self.agent_type == "BEST-FIRST":
+            search_final_node = self.best_first_search(start_position, end_position)
+
         elif self.agent_type == "A*":
             raise NotImplementedError
 
@@ -197,22 +174,22 @@ class Agent:
         :param end_position: Ending position tuple.
         :return: Result node after performing BFS.
         """
-        node = Node(start_position)
-        goal = Node(end_position)
+        current_node = Node(start_position)
+        goal_node = Node(end_position)
 
-        # Test goal state
-        if goal.__eq__(node):
-            return node
+        # Test goal_node state
+        if goal_node.__eq__(current_node):
+            return current_node
 
-        frontier = deque([node])
+        frontier = deque([current_node])
         explored = set()
         while frontier:
-            node = frontier.popleft()
-            explored.add(node)
+            current_node = frontier.popleft()
+            explored.add(current_node)
 
             # Nodes that are reachable in one step
-            for child_position in ADJACENCY_DICT[node.position]:
-                child_node = Node(child_position, parent=node)
+            for child_position in ADJACENCY_DICT[current_node.position]:
+                child_node = Node(child_position, parent=current_node)
                 if (
                     not self.position_occupied(child_node)
                     and not self.invalid_position(child_node)
@@ -220,7 +197,7 @@ class Agent:
                     and child_node not in frontier
                 ):
                     child_node.add_action()
-                    if goal.__eq__(child_node):
+                    if goal_node.__eq__(child_node):
                         return child_node
                     frontier.append(child_node)
         return None
@@ -233,23 +210,23 @@ class Agent:
         :param end_position: Ending position tuple.
         :return: Result node after performing DFS.
         """
-        node = Node(start_position)
-        goal = Node(end_position)
+        current_node = Node(start_position)
+        goal_node = Node(end_position)
 
-        if goal.__eq__(node):
-            return node
-        frontier = [node]
+        if goal_node.__eq__(current_node):
+            return current_node
+        frontier = [current_node]
         explored = set()
         while frontier:
-            node = frontier.pop()
+            current_node = frontier.pop()
 
-            if goal.__eq__(node):
-                return node
+            if goal_node.__eq__(current_node):
+                return current_node
 
-            explored.add(node)
+            explored.add(current_node)
 
-            for child_position in ADJACENCY_DICT[node.position]:
-                child_node = Node(child_position, parent=node)
+            for child_position in ADJACENCY_DICT[current_node.position]:
+                child_node = Node(child_position, parent=current_node)
                 if (
                     not self.position_occupied(child_node)
                     and not self.invalid_position(child_node)
@@ -259,6 +236,84 @@ class Agent:
                     child_node.add_action()
                     frontier.append(child_node)
         return None
+
+    def calculate_euclidean_distance(self, coords_a, coords_b):
+        """
+        Calculate the Euclidean distance between two nodes in 3D space.
+
+        :param coords_a: First node coordinates.
+        :param coords_b: Second node coordinates.
+        :return: Euclidean distance between the two nodes.
+        """
+        x_a, y_a, z_a = coords_a
+        x_b, y_b, z_b = coords_b
+
+        distance = ((x_b - x_a) ** 2 + (y_b - y_a) ** 2 + (z_b - z_a) ** 2) ** 0.5
+
+        return distance
+
+    def calculate_manhattan_distance(self, coords_a, coords_b):
+        """
+        Calculate the Manhattan distance between two nodes in 3D space.
+
+        :param coords_a: First node coordinates.
+        :param coords_b: Second node coordinates.
+        :return: Manhattan distance between the two nodes.
+        """
+        x_a, y_a, z_a = coords_a.position
+        x_b, y_b, z_b = coords_b.position
+
+        distance = abs(x_b - x_a) + abs(y_b - y_a) + abs(z_b - z_a)
+        return distance
+
+    def best_first_search(self, start_position, end_position):
+        """
+        Perform best-first search to find a path in the grid recursively.
+
+        :param start_position: Starting position tuple.
+        :param end_position: Ending position tuple.
+        :return: Result node after performing BFS.
+        """
+        start_node = Node(start_position)
+        goal_node = Node(end_position)
+
+        if goal_node.__eq__(start_node):
+            return start_node
+
+        explored = set()
+        return self._recursive_best_first(start_node, goal_node, explored)
+
+    # def heuristic()
+
+    def _recursive_best_first(self, current_node, goal_node, explored):
+        if goal_node.__eq__(current_node):
+            return current_node
+
+        explored.add(current_node)
+
+        # Generate child nodes
+        children = []
+        for child_position in ADJACENCY_DICT[current_node.position]:
+            child_node = Node(child_position, parent=current_node)
+
+            if (
+                not self.position_occupied(child_node)
+                and not self.invalid_position(child_node)
+                and child_node not in explored
+            ):
+                child_node.add_action()
+                children.append(child_node)
+
+        if not children:
+            return None
+
+        # Sort child nodes based on their heuristic value, with the lowest first
+        children.sort(
+            key=lambda node: self.calculate_manhattan_distance(node, goal_node)
+        )
+
+        # Recursively explore the node with the lowest heuristic value first
+        return self._recursive_best_first(children[0], goal_node, explored)
 
     def unwrap_path(self, node):
         """
