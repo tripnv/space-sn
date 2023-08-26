@@ -108,46 +108,6 @@ class Agent:
             return True
         return False
 
-    def generate_path(
-        self,
-        start_position: tuple,
-        end_position: tuple,
-        occupied_positions: List[tuple],
-    ):
-        """
-        Generate a sequence of actions from start to end avoiding occupied positions.
-        
-        :param start_position: Starting position tuple.
-        :param end_position: Ending position tuple.
-        :param occupied_positions: List of positions that are occupied.
-        :return: List of actions to move from start to end.
-        """ """Generate the sequence of actions that connect the start position to the end position such that the occupied squares are avoided."""
-        self.occupied_positions = [Node(block) for block in occupied_positions]
-        # Agent scenarios
-        if self.agent_type == "BFS":
-            search_final_node = self.bfs(start_position, end_position)
-
-        elif self.agent_type == "DFS":
-            search_final_node = self.dfs(start_position, end_position)
-            # if search_final_node == None:
-            #     search_final_node = self.dfs(
-            #         start_position, self.occupied_positions[-1]
-            #     )
-
-        elif self.agent_type == "BEST-FIRST":
-            search_final_node = self.best_first_search(start_position, end_position)
-
-        elif self.agent_type == "A*":
-            raise NotImplementedError
-
-        else:
-            raise NotImplementedError
-
-        if search_final_node == None:
-            search_final_node = self.select_available_position(start_position)
-
-        return self.unwrap_path(search_final_node)
-
     def select_available_position(self, start_position):
         """Return the first available child node; if no such child has been found select the first adjacent position
 
@@ -237,36 +197,50 @@ class Agent:
                     frontier.append(child_node)
         return None
 
-    def calculate_euclidean_distance(self, coords_a, coords_b):
+    def calculate_euclidean_distance(self, node_a, node_b):
         """
         Calculate the Euclidean distance between two nodes in 3D space.
 
-        :param coords_a: First node coordinates.
-        :param coords_b: Second node coordinates.
+        :param node_a: First node coordinates.
+        :param node_b: Second node coordinates.
         :return: Euclidean distance between the two nodes.
         """
-        x_a, y_a, z_a = coords_a
-        x_b, y_b, z_b = coords_b
+        x_a, y_a, z_a = node_a.position
+        x_b, y_b, z_b = node_b.position
 
         distance = ((x_b - x_a) ** 2 + (y_b - y_a) ** 2 + (z_b - z_a) ** 2) ** 0.5
 
         return distance
 
-    def calculate_manhattan_distance(self, coords_a, coords_b):
+    def calculate_manhattan_distance(self, node_a, node_b):
         """
         Calculate the Manhattan distance between two nodes in 3D space.
 
-        :param coords_a: First node coordinates.
-        :param coords_b: Second node coordinates.
+        :param node_a: First node coordinates.
+        :param node_b: Second node coordinates.
         :return: Manhattan distance between the two nodes.
         """
-        x_a, y_a, z_a = coords_a.position
-        x_b, y_b, z_b = coords_b.position
+        x_a, y_a, z_a = node_a.position
+        x_b, y_b, z_b = node_b.position
 
         distance = abs(x_b - x_a) + abs(y_b - y_a) + abs(z_b - z_a)
         return distance
 
-    def best_first_search(self, start_position, end_position):
+    def fx(self, start_node, current_node, end_node):
+        """
+        F(x) = g(x) + h(x)
+        where g(x) returns the distance of current_node from the start_node
+        and h(x) returns the distance to the end_node
+        """
+        gx = self.calculate_euclidean_distance(start_node, current_node)
+        hx = self.calculate_euclidean_distance(current_node, end_node)
+        return gx + hx
+
+    def fx_greedy(self, _, current_node, end_node):
+        hx = self.calculate_euclidean_distance(current_node, end_node)
+        return hx
+
+    def best_first_search(self, start_position, end_position, heuristic):
         """
         Perform best-first search to find a path in the grid recursively.
 
@@ -281,11 +255,13 @@ class Agent:
             return start_node
 
         explored = set()
-        return self._recursive_best_first(start_node, goal_node, explored)
+        return self._recursive_best_first(
+            start_node, start_node, goal_node, explored, heuristic
+        )
 
-    # def heuristic()
-
-    def _recursive_best_first(self, current_node, goal_node, explored):
+    def _recursive_best_first(
+        self, start_node, current_node, goal_node, explored, heuristic
+    ):
         if goal_node.__eq__(current_node):
             return current_node
 
@@ -309,11 +285,18 @@ class Agent:
 
         # Sort child nodes based on their heuristic value, with the lowest first
         children.sort(
-            key=lambda node: self.calculate_manhattan_distance(node, goal_node)
+            # key=lambda node: self.calculate_manhattan_distance(node, goal_node)
+            key=lambda child_node: heuristic(start_node, child_node, goal_node)
         )
 
         # Recursively explore the node with the lowest heuristic value first
-        return self._recursive_best_first(children[0], goal_node, explored)
+        return self._recursive_best_first(
+            start_node, children[0], goal_node, explored, heuristic
+        )
+
+    def a_star(self, start_position, end_position):
+        # Best first search with an fx = gx + hx heuristic
+        return self.best_first_search(start_position, end_position, heuristic=self.fx)
 
     def unwrap_path(self, node):
         """
@@ -327,6 +310,50 @@ class Agent:
             action_queue.appendleft(node.action)
             node = node.parent
         return action_queue
+
+    def generate_path(
+        self,
+        start_position: tuple,
+        end_position: tuple,
+        occupied_positions: List[tuple],
+    ):
+        """
+        Generate a sequence of actions from start to end avoiding occupied positions.
+        
+        :param start_position: Starting position tuple.
+        :param end_position: Ending position tuple.
+        :param occupied_positions: List of positions that are occupied.
+        :return: List of actions to move from start to end.
+        """ """Generate the sequence of actions that connect the start position to the end position such that the occupied squares are avoided."""
+        self.occupied_positions = [Node(block) for block in occupied_positions]
+        # Agent scenarios
+        if self.agent_type == "BFS":
+            search_final_node = self.bfs(start_position, end_position)
+
+        elif self.agent_type == "DFS":
+            search_final_node = self.dfs(start_position, end_position)
+            # if search_final_node == None:
+            #     search_final_node = self.dfs(
+            #         start_position, self.occupied_positions[-1]
+            #     )
+
+        elif self.agent_type == "BEST-FIRST":
+            search_final_node = self.best_first_search(
+                start_position, end_position, self.fx_greedy
+            )
+
+        elif self.agent_type == "ASTAR":
+            search_final_node = self.a_star(
+                start_position,
+                end_position,
+            )
+        else:
+            raise NotImplementedError
+
+        if search_final_node == None:
+            search_final_node = self.select_available_position(start_position)
+
+        return self.unwrap_path(search_final_node)
 
 
 ADJACENCY_DICT = {key: [] for key in product(range(GRID_NUM), repeat=3)}

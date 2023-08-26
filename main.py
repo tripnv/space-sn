@@ -6,7 +6,7 @@ import click
 @click.option(
     "--agent",
     "-a",
-    type=click.Choice(["human", "bfs", "dfs"]),
+    type=click.Choice(["human", "bfs", "dfs", "best-first", "astar"]),
     default="human",
     help="Agent type",
 )

@@ -411,6 +411,7 @@ class Environment(Sketch):
             self.min_sl = steps_per_length
 
         metrics = {
+            "agent-type": self.agent.agent_type,
             "frame count": frame_count,
             "snake length": snake_length,
             "steps/length": steps_per_length,
