@@ -1,4 +1,5 @@
 # %%
+import os
 from typing import List
 from search import Node, ADJACENCY_DICT, Agent
 import numpy as np
@@ -6,6 +7,32 @@ from py5 import Sketch
 from itertools import product
 from random import choice
 from collections import deque
+from datetime import datetime
+from PIL import Image
+import imageio
+
+
+screen_height = 1914
+screen_width = 2104
+
+middle_y = 1914 // 2
+
+# colors = {"red": (255, 0, 0), "green": (0, 255, 0), "blue": (0, 0, 255)}
+FRAME_RATE = 60
+FRAME_COUNT_DIVISOR = 15
+
+GRID_NUM = 10
+UNIT_SIZE = 50
+RENDER_UNIT_SIZE = 45
+UNIT_HALF = UNIT_SIZE // 2
+ARENA_SIZE = GRID_NUM * UNIT_SIZE
+BLOCK_STROKE = False
+start_position = middle_y
+POSSIBLE_COORDINATES = set(product(range(GRID_NUM), repeat=3))
+# ADJACENT_COORDS = create_adjacency_dict(GRID_NUM)
+OUTPUT_FOLDER = "saved"
+VIDEO_OUTPUT_FOLDER = "videos"
+VIDEO_FRAME_RATE = 30
 
 
 # Basic building block for rendering
@@ -190,33 +217,15 @@ class Snake:
                 tail_idx += 1
 
 
-screen_height = 1914
-screen_width = 2104
-
-middle_y = 1914 // 2
-
-# colors = {"red": (255, 0, 0), "green": (0, 255, 0), "blue": (0, 0, 255)}
-FRAME_RATE = 60
-FRAME_COUNT_DIVISOR = 15
-
-GRID_NUM = 10
-UNIT_SIZE = 50
-RENDER_UNIT_SIZE = 45
-UNIT_HALF = UNIT_SIZE // 2
-ARENA_SIZE = GRID_NUM * UNIT_SIZE
-BLOCK_STROKE = False
-start_position = middle_y
-POSSIBLE_COORDINATES = set(product(range(GRID_NUM), repeat=3))
-# ADJACENT_COORDS = create_adjacency_dict(GRID_NUM)
-
-
 # %%
 class Environment(Sketch):
     """
     Represents the environment in which the snake operates, handling its movement, food spawning, and interactions.
     """
 
-    def __init__(self, agent: Agent = None, frame_rate: float = 30) -> None:
+    def __init__(
+        self, agent: Agent = None, frame_rate: float = 30, generate_video: bool = False
+    ) -> None:
         """
         Initialize the environment with optional agent and frame rate.
 
@@ -240,7 +249,8 @@ class Environment(Sketch):
         self.agent = agent
 
         self.frame_rate_ = frame_rate
-
+        self.generate_video_frames = generate_video
+        self.frames = []
         # Logging metrics
         self.max_sl = 0
         self.min_sl = 100
@@ -320,6 +330,35 @@ class Environment(Sketch):
 
         return self.snake.length
 
+    def generate_video(self, fps=VIDEO_FRAME_RATE):
+        """
+        Convert images in a folder into a video.
+
+        Parameters:
+        - img_folder: The path to the folder containing images.
+        - output_video: The path to the output video file.
+        - fps: Frames per second for the resulting video.
+        """
+        img_folder = self.output_folder_path
+        output_video = self.output_folder_path + ".mp4"
+        images = sorted(
+            [
+                os.path.join(img_folder, img)
+                for img in os.listdir(img_folder)
+                if img.endswith((".png", ".jpg", ".jpeg"))
+            ]
+        )
+
+        if not images:
+            raise ValueError("No images found in the specified directory!")
+
+        with imageio.get_writer(output_video, mode="I", fps=fps) as writer:
+            for img_path in images:
+                img = Image.open(img_path)
+                writer.append_data(np.array(img))
+
+        print(f"Video {output_video} created successfully!")
+
     def settings(self):
         """
         Define the visual settings for rendering the environment.
@@ -336,12 +375,32 @@ class Environment(Sketch):
         self.rect_mode(2)
         camera = self.camera()
 
+        if self.generate_video_frames:
+            # Create a folder for the rendered images
+            timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+            if not os.path.exists(OUTPUT_FOLDER):
+                video_folder = os.path.join(OUTPUT_FOLDER, VIDEO_OUTPUT_FOLDER)
+                os.makedirs(video_folder)
+            folder_name = f"{self.agent.agent_type.lower()}_{timestamp}"
+            folder_name = os.path.join(OUTPUT_FOLDER, folder_name)
+            self.output_folder_path = folder_name
+            self.frame_rate
+
+            os.makedirs(folder_name)
+
     def draw(self):
         """
         Render the environment, snake, food, and other graphical elements.
         """
-        if self.snake.status == False:
-            self.reset()
+
+        # if self.frame_count % 30 == 0:
+        if self.generate_video_frames:
+            # Drop alpha channel as jpg doesn't support it
+            self.save_frame(
+                filename=f"{self.output_folder_path}/frame_#####.jpg",
+                drop_alpha=True,
+                use_thread=True,
+            )
 
         self.select_direction()
 
@@ -365,6 +424,15 @@ class Environment(Sketch):
         # Render food
         self.draw_block(self.food, RENDER_UNIT_SIZE, c_red_50, BLOCK_STROKE)
         self.draw_location_support(self.food, c_red_25)
+
+        if self.snake.status == False:
+            # Generate video from frames
+            if self.generate_video_frames:
+                self.generate_video()
+
+            # maybe this could be replaced
+            self.exit_sketch()
+            # self.reset()
 
     def draw_block(self, block, block_size, color, no_strokes):
         """
@@ -584,6 +652,12 @@ class Environment(Sketch):
             self.snake.head_direction = self.snake.directions["z_backward"]
         elif self.key == "s":
             self.snake.head_direction = self.snake.directions["z_forward"]
+
+        elif self.key == "q":
+            if self.generate_video_frames:
+                self.generate_video()
+
+            self.exit_sketch()
 
 
 # %%
