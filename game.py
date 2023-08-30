@@ -1,4 +1,5 @@
 # %%
+from shutil import rmtree
 import os
 from typing import List
 from search import Node, ADJACENCY_DICT, Agent
@@ -224,7 +225,7 @@ class Environment(Sketch):
     """
 
     def __init__(
-        self, agent: Agent = None, frame_rate: float = 30, generate_video: bool = False
+        self, agent: Agent = None, frame_rate: float = 30, generate_video: bool = True
     ) -> None:
         """
         Initialize the environment with optional agent and frame rate.
@@ -339,6 +340,23 @@ class Environment(Sketch):
         - output_video: The path to the output video file.
         - fps: Frames per second for the resulting video.
         """
+
+        def delete_folder(path):
+            """
+            Delete a folder and its contents.
+
+            Parameters:
+            - path: The path to the folder to be deleted.
+            """
+            # Check if the directory exists
+            if not os.path.exists(path):
+                print(f"The directory {path} does not exist.")
+                return
+
+            # Use shutil.rmtree() to remove the directory and its contents
+            rmtree(path)
+            print(f"Directory {path} and its contents have been removed.")
+
         img_folder = self.output_folder_path
         output_video = self.output_folder_path + ".mp4"
         images = sorted(
@@ -358,6 +376,7 @@ class Environment(Sketch):
                 writer.append_data(np.array(img))
 
         print(f"Video {output_video} created successfully!")
+        delete_folder(self.output_folder_path)
 
     def settings(self):
         """
