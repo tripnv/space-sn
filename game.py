@@ -256,7 +256,7 @@ class Environment(Sketch):
 
         self.frame_rate_ = frame_rate
         self.generate_video_frames = generate_video
-        self.video_frames = []
+
         # Logging metrics
         self.max_sl = 0
         self.min_sl = 100
@@ -395,21 +395,7 @@ class Environment(Sketch):
                 writer.append_data(img_array)
 
         print(f"Video {output_video} created successfully!")
-        # delete_folder(self.output_folder_path)
-
-    # def generate_video_2(self, fps=VIDEO_FRAME_RATE):
-    #     img_folder = self.output_folder_path
-    #     output_video = self.output_folder_path + ".mp4"
-
-    #     if not self.video_frames:
-    #         raise ValueError("No images found in the specified directory!")
-
-    #     with imageio.get_writer(output_video, mode="I", fps=fps) as writer:
-    #         for img_array in self.video_frames:
-    #             print(type(img_array))
-    #             print(img_array.shape, img_array.dtype)
-    #             writer.append_data(img_array)
-    #     print(f"Video {output_video} created successfully!")
+        delete_folder(self.output_folder_path)
 
     def settings(self):
         """
@@ -426,18 +412,6 @@ class Environment(Sketch):
         self.frame_rate(self.frame_rate_)
         self.rect_mode(2)
         camera = self.camera()
-
-        # v0.1
-        # writer = skvideo.io.FFmpegWriter(
-        #     self.output_folder_path + ".mp4",
-        # )
-        # py5_tools.offline_frame_processing(
-        #     writer.writeFrame,
-        #     batch_size=1,
-        #     limit=0,
-        #     sketch=self,
-        #     complete_func=writer.close,
-        # )
 
         self.start_time = time.time()
 
@@ -705,10 +679,7 @@ class Environment(Sketch):
 
         elif self.key == "q":
             if self.generate_video_frames:
-                # print(self.video_frames)
                 self.generate_video()
-
-            # self.generate_video_2()
 
             self.exit_sketch()
 
