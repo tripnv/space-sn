@@ -1,4 +1,5 @@
 # %%
+import time
 from shutil import rmtree
 import os
 from typing import List
@@ -11,7 +12,11 @@ from collections import deque
 from datetime import datetime
 from PIL import Image
 import imageio
+import py5_tools
+import cv2
+import skvideo.io
 
+# from py5_tools import save_frames
 
 screen_height = 1914
 screen_width = 2104
@@ -251,10 +256,22 @@ class Environment(Sketch):
 
         self.frame_rate_ = frame_rate
         self.generate_video_frames = generate_video
-        self.frames = []
+        self.video_frames = []
         # Logging metrics
         self.max_sl = 0
         self.min_sl = 100
+
+        if self.generate_video_frames:
+            # Create a folder for the rendered images
+            timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+            if not os.path.exists(OUTPUT_FOLDER):
+                video_folder = os.path.join(OUTPUT_FOLDER, VIDEO_OUTPUT_FOLDER)
+                os.makedirs(video_folder)
+            folder_name = f"{self.agent.agent_type.lower()}_{timestamp}"
+            folder_name = os.path.join(OUTPUT_FOLDER, folder_name)
+            self.output_folder_path = folder_name
+
+            os.makedirs(folder_name)
 
     def reset(self):
         """
@@ -373,10 +390,26 @@ class Environment(Sketch):
         with imageio.get_writer(output_video, mode="I", fps=fps) as writer:
             for img_path in images:
                 img = Image.open(img_path)
-                writer.append_data(np.array(img))
+                img_array = np.array(img)
+
+                writer.append_data(img_array)
 
         print(f"Video {output_video} created successfully!")
-        delete_folder(self.output_folder_path)
+        # delete_folder(self.output_folder_path)
+
+    # def generate_video_2(self, fps=VIDEO_FRAME_RATE):
+    #     img_folder = self.output_folder_path
+    #     output_video = self.output_folder_path + ".mp4"
+
+    #     if not self.video_frames:
+    #         raise ValueError("No images found in the specified directory!")
+
+    #     with imageio.get_writer(output_video, mode="I", fps=fps) as writer:
+    #         for img_array in self.video_frames:
+    #             print(type(img_array))
+    #             print(img_array.shape, img_array.dtype)
+    #             writer.append_data(img_array)
+    #     print(f"Video {output_video} created successfully!")
 
     def settings(self):
         """
@@ -394,31 +427,31 @@ class Environment(Sketch):
         self.rect_mode(2)
         camera = self.camera()
 
-        if self.generate_video_frames:
-            # Create a folder for the rendered images
-            timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
-            if not os.path.exists(OUTPUT_FOLDER):
-                video_folder = os.path.join(OUTPUT_FOLDER, VIDEO_OUTPUT_FOLDER)
-                os.makedirs(video_folder)
-            folder_name = f"{self.agent.agent_type.lower()}_{timestamp}"
-            folder_name = os.path.join(OUTPUT_FOLDER, folder_name)
-            self.output_folder_path = folder_name
-            self.frame_rate
+        # v0.1
+        # writer = skvideo.io.FFmpegWriter(
+        #     self.output_folder_path + ".mp4",
+        # )
+        # py5_tools.offline_frame_processing(
+        #     writer.writeFrame,
+        #     batch_size=1,
+        #     limit=0,
+        #     sketch=self,
+        #     complete_func=writer.close,
+        # )
 
-            os.makedirs(folder_name)
+        self.start_time = time.time()
 
     def draw(self):
         """
         Render the environment, snake, food, and other graphical elements.
         """
 
-        # if self.frame_count % 30 == 0:
         if self.generate_video_frames:
-            # Drop alpha channel as jpg doesn't support it
             self.save_frame(
-                filename=f"{self.output_folder_path}/frame_#####.jpg",
-                drop_alpha=True,
+                filename=f"{self.output_folder_path}/frame_#####.png",
+                drop_alpha=False,
                 use_thread=True,
+                format="png",
             )
 
         self.select_direction()
@@ -446,9 +479,6 @@ class Environment(Sketch):
 
         if self.snake.status == False:
             # Generate video from frames
-            if self.generate_video_frames:
-                self.generate_video()
-
             # maybe this could be replaced
             self.exit_sketch()
             # self.reset()
@@ -484,7 +514,7 @@ class Environment(Sketch):
 
         :param offset: Positional offset to begin displaying metrics.
         """
-
+        fps = self.frame_count // (time.time() - self.start_time)
         frame_count = self.frame_count
         snake_length = self.snake.length
         max_steps_per_length = self.max_sl
@@ -500,6 +530,7 @@ class Environment(Sketch):
         metrics = {
             "agent-type": self.agent.agent_type,
             "frame count": frame_count,
+            "fps": fps,
             "snake length": snake_length,
             "steps/length": steps_per_length,
             "max s/l": self.max_sl,
@@ -674,7 +705,10 @@ class Environment(Sketch):
 
         elif self.key == "q":
             if self.generate_video_frames:
+                # print(self.video_frames)
                 self.generate_video()
+
+            # self.generate_video_2()
 
             self.exit_sketch()
 

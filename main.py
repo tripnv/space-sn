@@ -1,5 +1,7 @@
 import game
 import click
+import py5_tools
+import skvideo.io
 
 
 @click.command()
@@ -28,6 +30,16 @@ def run(agent, mode, frame_rate):
         score = environment.run_headless()
         click.echo(f"{agent_.agent_type} agent scored: {score}")
     elif mode == "render":
+        # writer = skvideo.io.FFmpegWriter(
+        #     environment.output_folder_path + ".mp4",
+        # )
+        # py5_tools.offline_frame_processing(
+        #     writer.writeFrame,
+        #     batch_size=1,
+        #     limit=0,
+        #     sketch=environment,
+        #     complete_func=writer.close,
+        # )
         environment.run_sketch()
 
 
