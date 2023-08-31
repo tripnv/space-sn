@@ -39,6 +39,8 @@ POSSIBLE_COORDINATES = set(product(range(GRID_NUM), repeat=3))
 OUTPUT_FOLDER = "saved"
 VIDEO_OUTPUT_FOLDER = "videos"
 VIDEO_FRAME_RATE = 30
+INFO_OFFSET_X = 400
+INFO_OFFSET_Y = 0
 
 
 # Basic building block for rendering
@@ -230,7 +232,7 @@ class Environment(Sketch):
     """
 
     def __init__(
-        self, agent: Agent = None, frame_rate: float = 30, generate_video: bool = True
+        self, agent: Agent = None, frame_rate: float = 30, generate_video: bool = False
     ) -> None:
         """
         Initialize the environment with optional agent and frame rate.
@@ -265,8 +267,7 @@ class Environment(Sketch):
             # Create a folder for the rendered images
             timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
             if not os.path.exists(OUTPUT_FOLDER):
-                video_folder = os.path.join(OUTPUT_FOLDER, VIDEO_OUTPUT_FOLDER)
-                os.makedirs(video_folder)
+                os.makedirs(OUTPUT_FOLDER)
             folder_name = f"{self.agent.agent_type.lower()}_{timestamp}"
             folder_name = os.path.join(OUTPUT_FOLDER, folder_name)
             self.output_folder_path = folder_name
@@ -397,6 +398,14 @@ class Environment(Sketch):
         print(f"Video {output_video} created successfully!")
         delete_folder(self.output_folder_path)
 
+    def save_frame_to_disk(self):
+        self.save_frame(
+            filename=f"{self.output_folder_path}/frame_#####.png",
+            drop_alpha=False,
+            use_thread=True,
+            format="png",
+        )
+
     def settings(self):
         """
         Define the visual settings for rendering the environment.
@@ -421,12 +430,7 @@ class Environment(Sketch):
         """
 
         if self.generate_video_frames:
-            self.save_frame(
-                filename=f"{self.output_folder_path}/frame_#####.png",
-                drop_alpha=False,
-                use_thread=True,
-                format="png",
-            )
+            self.save_frame_to_disk()
 
         self.select_direction()
 
@@ -452,10 +456,9 @@ class Environment(Sketch):
         self.draw_location_support(self.food, c_red_25)
 
         if self.snake.status == False:
-            # Generate video from frames
-            # maybe this could be replaced
+            if self.generate_video_frames:
+                self.generate_video()
             self.exit_sketch()
-            # self.reset()
 
     def draw_block(self, block, block_size, color, no_strokes):
         """
@@ -482,7 +485,7 @@ class Environment(Sketch):
 
         self.pop()
 
-    def display_info(self, offset):
+    def display_info(self, offset_x=INFO_OFFSET_X, offset_y=INFO_OFFSET_Y):
         """
         Display the environment's metrics on the screen.
 
@@ -492,14 +495,10 @@ class Environment(Sketch):
         frame_count = self.frame_count
         snake_length = self.snake.length
         max_steps_per_length = self.max_sl
-        min_steps_per_length = self.min_sl
         steps_per_length = frame_count // snake_length
 
         if steps_per_length > max_steps_per_length:
             self.max_sl = steps_per_length
-
-        if steps_per_length < min_steps_per_length:
-            self.min_sl = steps_per_length
 
         metrics = {
             "agent-type": self.agent.agent_type,
@@ -507,8 +506,7 @@ class Environment(Sketch):
             "fps": fps,
             "snake length": snake_length,
             "steps/length": steps_per_length,
-            "max s/l": self.max_sl,
-            "min s/l": self.min_sl,
+            "max steps/length": self.max_sl,
         }
 
         for i, (text, value) in enumerate(metrics.items()):
@@ -516,10 +514,11 @@ class Environment(Sketch):
             self.fill(self.color(0, 0, 0))
             self.text_size(32)
             self.text(
-                f"""{text}: {value}
-                """,
-                offset - UNIT_SIZE,
-                offset + i * UNIT_SIZE,
+                f"""{text}: {value:.2f}"""
+                if not text == "agent-type"
+                else f"""{text}: {value}""",
+                offset_x - UNIT_SIZE,
+                offset_y + i * UNIT_SIZE,
                 0,
             )
 
@@ -586,7 +585,9 @@ class Environment(Sketch):
 
         self.pop()
 
-        self.display_info(start_position - 250)
+        self.display_info(
+            start_position - INFO_OFFSET_X, start_position - INFO_OFFSET_Y
+        )
 
     def draw_support_lines_head(self):
         """
