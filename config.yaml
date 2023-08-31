@@ -5,7 +5,7 @@ window:
 
 
 environment:
-  frame_rate: 60
+  frame_rate: 120
   frame_count_divisor: 15
   
   grid_num: 10
