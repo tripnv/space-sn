@@ -3,44 +3,32 @@ import time
 from shutil import rmtree
 import os
 from typing import List
-from search import Node, ADJACENCY_DICT, Agent
+from search import Agent
 import numpy as np
 from py5 import Sketch
 from itertools import product
 from random import choice
-from collections import deque
 from datetime import datetime
 from PIL import Image
 import imageio
-import py5_tools
-import cv2
-import skvideo.io
+from yaml import safe_load
 
-# from py5_tools import save_frames
+with open("./config", "r") as f:
+    config = safe_load(f)
 
-screen_height = 1914
-screen_width = 2104
 
-middle_y = 1914 // 2
+config["environment"]["render_options"]["start_position"] = (
+    config["window"]["height"] // 2
+)
 
-# colors = {"red": (255, 0, 0), "green": (0, 255, 0), "blue": (0, 0, 255)}
-FRAME_RATE = 60
-FRAME_COUNT_DIVISOR = 15
+config["environment"]["render_options"]["unit_size_half"] = (
+    config["environment"]["render_options"]["unit_size"] // 2
+)
+config["environment"]["render_options"]["arena_size"] = (
+    self.grid_num * config["environment"]["render_options"]["unit_size"]
+)
 
-GRID_NUM = 10
-UNIT_SIZE = 50
-RENDER_UNIT_SIZE = 45
-UNIT_HALF = UNIT_SIZE // 2
-ARENA_SIZE = GRID_NUM * UNIT_SIZE
-BLOCK_STROKE = False
-start_position = middle_y
-POSSIBLE_COORDINATES = set(product(range(GRID_NUM), repeat=3))
-# ADJACENT_COORDS = create_adjacency_dict(GRID_NUM)
-OUTPUT_FOLDER = "saved"
-VIDEO_OUTPUT_FOLDER = "videos"
-VIDEO_FRAME_RATE = 30
-INFO_OFFSET_X = 400
-INFO_OFFSET_Y = 0
+candidate_coordinates = set(product(range(self.grid_num), repeat=3))
 
 
 # Basic building block for rendering
@@ -207,7 +195,7 @@ class Snake:
         If it has, set the snake's status to dead.
         """
         head_coordinates = self.head.as_numpy()
-        if not ((0 <= head_coordinates) & (head_coordinates < GRID_NUM)).all():
+        if not ((0 <= head_coordinates) & (head_coordinates < self.grid_num)).all():
             self.status = False
 
     def check_self_collision(self) -> None:
@@ -231,9 +219,7 @@ class Environment(Sketch):
     Represents the environment in which the snake operates, handling its movement, food spawning, and interactions.
     """
 
-    def __init__(
-        self, agent: Agent = None, frame_rate: float = 30, generate_video: bool = False
-    ) -> None:
+    def __init__(self, agent: Agent = None, **config) -> None:
         """
         Initialize the environment with optional agent and frame rate.
 
@@ -241,7 +227,7 @@ class Environment(Sketch):
         :param frame_rate: The rate at which frames are rendered. Default is 30.
         """
         super().__init__()
-        # self.space_representation = np.zeros((GRID_NUM, GRID_NUM, GRID_NUM))
+        # self.space_representation = np.zeros((self.grid_num, self.grid_num, self.grid_num))
         # self.snake = Snake(self.generate_empty_block())
 
         # Initialize snake
@@ -256,9 +242,32 @@ class Environment(Sketch):
         # Initialize autonomous agent
         self.agent = agent
 
-        self.frame_rate_ = frame_rate
-        self.generate_video_frames = generate_video
+        self._frame_rate = config["environment"]["frame_rate"]
+        self._render_video = config["environment"]["video"]["render_video"]
+        self._video_output_folder_path = config["environment"]["video"]["output_folder"]
+        self._frame_count_divisor = config["environment"]["frame_count_divisor"]
+        self._render_frame_rate = config["environment"]["render_options"]["frame_rate"]
+        self._render_arena_size = config["environment"]["render_options"]["arena_size"]
+        self._render_unit_size = config["environment"]["render_options"][
+            "render_unit_size"
+        ]
+        self._unit_block_stroke = config["environment"]["render_options"][
+            "block_stroke"
+        ]
+        self._unit_size = config["environment"]["render_options"]["unit_size"]
+        self._unit_size_half = self._unit_size_half
+        self._info_offset_x = config["environment"]["info"]["offset_x"]
+        self._info_offset_y = config["environment"]["info"]["offset_y"]
 
+        self._snake_primary_color = self.color(0, 255, 0, 25)
+        self._snake_secondary_color = self.color(200, 255, 0, 50)
+        self._food_primary_color = self.color(255, 0, 0, 50)
+        self._food_secondary_color = self.color(255, 0, 0, 25)
+        self._unit_stroke_weight = config["environment"]["render_options"][
+            "unit_stroke_weight"
+        ]
+        self._grid_stroke_weight = 0.25
+        self._some_stroke_value = 200
         # Logging metrics
         self.max_sl = 0
         self.min_sl = 100
@@ -266,19 +275,20 @@ class Environment(Sketch):
         if self.generate_video_frames:
             # Create a folder for the rendered images
             timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
-            if not os.path.exists(OUTPUT_FOLDER):
-                os.makedirs(OUTPUT_FOLDER)
-            folder_name = f"{self.agent.agent_type.lower()}_{timestamp}"
-            folder_name = os.path.join(OUTPUT_FOLDER, folder_name)
-            self.output_folder_path = folder_name
+            if not os.path.exists(self._video_output_folder_path):
+                os.makedirs(self._video_output_folder_path)
+            self._run_name = f"{self.agent.agent_type.lower()}_{timestamp}"
+            self._run_export_path = os.path.join(
+                self._video_output_folder_path, self._run_name
+            )
 
-            os.makedirs(folder_name)
+            os.makedirs(self._run_export_path)
 
     def reset(self):
         """
         Reset the environment to an initial state.
         """
-        # self.space_representation = np.zeros((GRID_NUM, GRID_NUM, GRID_NUM))
+        # self.space_representation = np.zeros((self.grid_num, self.grid_num, self.grid_num))
         self.snake = Snake(Block(5, 5, 5))
         # self.update_space_representation()
         self.food = self.generate_empty_block()
@@ -295,7 +305,7 @@ class Environment(Sketch):
         else:
             tail_set = set(self.snake.head.as_tuple())
         empty_x, empty_y, empty_z = choice(
-            list(POSSIBLE_COORDINATES.difference(tail_set))
+            list(candidate_coordinates.difference(tail_set))
         )
         empty_block = Block(empty_x, empty_y, empty_z)
 
@@ -327,7 +337,7 @@ class Environment(Sketch):
                 )
 
         else:
-            if self.frame_count % FRAME_COUNT_DIVISOR == 0:
+            if self.frame_count % self._frame_count_divisor == 0:
                 self.step(self.snake.head_direction)
 
     def check_food_collision(self):
@@ -349,7 +359,7 @@ class Environment(Sketch):
 
         return self.snake.length
 
-    def generate_video(self, fps=VIDEO_FRAME_RATE):
+    def generate_video(self, fps):
         """
         Convert images in a folder into a video.
 
@@ -418,7 +428,7 @@ class Environment(Sketch):
         Set up the environment and initialize the graphical elements.
         """
 
-        self.frame_rate(self.frame_rate_)
+        self._frame_rate(self.frame_rate_)
         self.rect_mode(2)
         camera = self.camera()
 
@@ -434,33 +444,50 @@ class Environment(Sketch):
 
         self.select_direction()
 
-        c_green_25 = self.color(0, 255, 0, 25)
-        c_green_50 = self.color(200, 255, 0, 50)
-        c_red_50 = self.color(255, 0, 0, 50)
-        c_red_25 = self.color(255, 0, 0, 25)
-
         self.background(255)
-        self.draw_arena(start_position, ARENA_SIZE, GRID_NUM)
+        self.draw_arena(
+            self.start_positon,
+            self._render_arena_size,
+            self.grid_num,
+        )
 
         # Render head
-        self.draw_location_support(self.snake.head, c_green_25)
+        self.draw_location_support(self.snake.head, self._snake_primary_color)
         self.draw_support_lines_head()
-        self.draw_block(self.snake.head, RENDER_UNIT_SIZE, c_green_25, BLOCK_STROKE)
+        self.draw_block(
+            self.snake.head,
+            self._render_unit_size,
+            self._snake_primary_color,
+            self._unit_block_stroke,
+            self._unit_stroke_weight,
+        )
 
         # Render tail
         for tail_block in self.snake.tail:
-            self.draw_block(tail_block, RENDER_UNIT_SIZE, c_green_50, BLOCK_STROKE)
+            self.draw_block(
+                tail_block,
+                self._render_unit_size,
+                self._snake_secondary_color,
+                self._unit_block_stroke,
+                self._unit_stroke_weight,
+            )
 
         # Render food
-        self.draw_block(self.food, RENDER_UNIT_SIZE, c_red_50, BLOCK_STROKE)
-        self.draw_location_support(self.food, c_red_25)
+        self.draw_block(
+            self.food,
+            self._render_unit_size,
+            self._food_primary_color,
+            self._unit_block_stroke,
+            self._unit_stroke_weight,
+        )
+        self.draw_location_support(self.food, self._food_secondary_color)
 
         if self.snake.status == False:
             if self.generate_video_frames:
                 self.generate_video()
             self.exit_sketch()
 
-    def draw_block(self, block, block_size, color, no_strokes):
+    def draw_block(self, block, block_size, color, no_strokes, stroke_weight=0.25):
         """
         Draw a block at a specific position with specified visuals.
 
@@ -476,33 +503,32 @@ class Environment(Sketch):
             self.no_stroke()
 
         self.translate(
-            start_position + block.x * UNIT_SIZE + UNIT_HALF,
-            start_position + block.y * UNIT_SIZE + UNIT_HALF,
-            block.z * UNIT_SIZE + UNIT_HALF,
+            self.start_positon + block.x * self._unit_size + self._unit_size_half,
+            self.start_positon + block.y * self._unit_size + self._unit_size_half,
+            block.z * self._unit_size + self._unit_size_half,
         )
         self.stroke_weight(0.25)
         self.box(block_size)
 
         self.pop()
 
-    def display_info(self, offset_x=INFO_OFFSET_X, offset_y=INFO_OFFSET_Y):
+    def display_info(self, offset_x, offset_y):
         """
         Display the environment's metrics on the screen.
 
         :param offset: Positional offset to begin displaying metrics.
         """
         fps = self.frame_count // (time.time() - self.start_time)
-        frame_count = self.frame_count
         snake_length = self.snake.length
         max_steps_per_length = self.max_sl
-        steps_per_length = frame_count // snake_length
+        steps_per_length = self.frame_count // snake_length
 
         if steps_per_length > max_steps_per_length:
             self.max_sl = steps_per_length
 
         metrics = {
             "agent-type": self.agent.agent_type,
-            "frame count": frame_count,
+            "frame count": self.frame_count,
             "fps": fps,
             "snake length": snake_length,
             "steps/length": steps_per_length,
@@ -517,14 +543,16 @@ class Environment(Sketch):
                 f"""{text}: {value:.2f}"""
                 if not text == "agent-type"
                 else f"""{text}: {value}""",
-                offset_x - UNIT_SIZE,
-                offset_y + i * UNIT_SIZE,
+                offset_x - self._unit_size,
+                offset_y + i * self._unit_size,
                 0,
             )
 
             self.pop()
 
-    def draw_arena(self, starting_distance, arena_size, grid_num):
+    def draw_arena(
+        self, starting_distance, arena_size, grid_num, grid_stroke_weight=0.25
+    ):
         """
         Render the 3D arena grid in which the snake operates.
 
@@ -546,23 +574,14 @@ class Environment(Sketch):
         grid_size = arena_size // grid_num
 
         self.push()
-        self.stroke_weight(0.5)
-
-        # # X axis
-        # self.stroke(self.color(*colors["blue"]))
-        # self.line(min_x, min_y, min_z, max_x, min_y, min_z)
-        # # Y axis
-        # self.stroke(self.color(*colors["red"]))
-        # self.line(min_x, min_y, min_z, min_x, max_y, min_z)
-        # # Z axis
-        # self.stroke(self.color(*colors["green"]))
-        # self.line(min_x, min_y, min_z, min_x, min_y, max_z)
+        self.stroke_weight(self._grid_stroke_weight)
 
         grids_xy = np.linspace(min_x, max_x, grid_num + 1)
         grids_z = np.linspace(min_z, max_z, grid_num + 1)
 
         # Y plane
-        self.stroke(200)
+        self.stroke(self._some_stroke_value)
+
         for y in grids_xy:
             self.line(min_x, y, min_z, max_x, y, min_z)
 
@@ -586,7 +605,8 @@ class Environment(Sketch):
         self.pop()
 
         self.display_info(
-            start_position - INFO_OFFSET_X, start_position - INFO_OFFSET_Y
+            self.start_positon - self._info_offset_x,
+            self.start_positon - self._info_offset_y,
         )
 
     def draw_support_lines_head(self):
@@ -595,30 +615,50 @@ class Environment(Sketch):
         """
         self.push()
         self.line(
-            start_position + self.snake.head.x * UNIT_SIZE + UNIT_HALF,
-            start_position + self.snake.head.y * UNIT_SIZE + UNIT_HALF,
-            self.snake.head.z * UNIT_SIZE + UNIT_HALF,
-            start_position + ARENA_SIZE,
-            start_position + self.snake.head.y * UNIT_SIZE + UNIT_HALF,
-            self.snake.head.z * UNIT_SIZE + UNIT_HALF,
+            self.start_positon
+            + self.snake.head.x * self._unit_size
+            + self._unit_size_half,
+            self.start_positon
+            + self.snake.head.y * self._unit_size
+            + self._unit_size_half,
+            self.snake.head.z * self._unit_size + self._unit_size_half,
+            self.start_positon + self._render_arena_size,
+            self.start_positon
+            + self.snake.head.y * self._unit_size
+            + self._unit_size_half,
+            self.snake.head.z * self._unit_size + self._unit_size_half,
         )
 
         self.line(
-            start_position + self.snake.head.x * UNIT_SIZE + UNIT_HALF,
-            start_position + self.snake.head.y * UNIT_SIZE + UNIT_HALF,
-            self.snake.head.z * UNIT_SIZE + UNIT_HALF,
-            start_position + self.snake.head.x * UNIT_SIZE + UNIT_HALF,
-            start_position + ARENA_SIZE,
-            self.snake.head.z * UNIT_SIZE + UNIT_HALF,
+            self.start_positon
+            + self.snake.head.x * self._unit_size
+            + self._unit_size_half,
+            self.start_positon
+            + self.snake.head.y * self._unit_size
+            + self._unit_size_half,
+            self.snake.head.z * self._unit_size + self._unit_size_half,
+            self.start_positon
+            + self.snake.head.x * self._unit_size
+            + self._unit_size_half,
+            self.start_positon + self._render_arena_size,
+            self.snake.head.z * self._unit_size + self._unit_size_half,
         )
 
         self.line(
-            start_position + self.snake.head.x * UNIT_SIZE + UNIT_HALF,
-            start_position + self.snake.head.y * UNIT_SIZE + UNIT_HALF,
+            self.start_positon
+            + self.snake.head.x * self._unit_size
+            + self._unit_size_half,
+            self.start_positon
+            + self.snake.head.y * self._unit_size
+            + self._unit_size_half,
             self.snake.head.z,
-            start_position + self.snake.head.x * UNIT_SIZE + UNIT_HALF,
-            start_position + self.snake.head.y * UNIT_SIZE + UNIT_HALF,
-            self.snake.head.z * UNIT_SIZE + UNIT_HALF,
+            self.start_positon
+            + self.snake.head.x * self._unit_size
+            + self._unit_size_half,
+            self.start_positon
+            + self.snake.head.y * self._unit_size
+            + self._unit_size_half,
+            self.snake.head.z * self._unit_size + self._unit_size_half,
         )
         self.pop()
 
@@ -633,32 +673,44 @@ class Environment(Sketch):
         self.fill(color)
         self.push()
         self.translate(
-            start_position + block.x * UNIT_SIZE + UNIT_HALF,
-            start_position + block.y * UNIT_SIZE + UNIT_HALF,
+            self.start_positon + block.x * self._unit_size + self._unit_size_half,
+            self.start_positon + block.y * self._unit_size + self._unit_size_half,
             0,
         )
         self.no_stroke()
-        self.box(UNIT_SIZE, UNIT_SIZE, 0)
+        self.box(
+            self._unit_size,
+            self._unit_size,
+            0,
+        )
         self.pop()
 
         self.push()
         self.translate(
-            start_position + block.x * UNIT_SIZE + UNIT_HALF,
-            start_position + ARENA_SIZE,
-            block.z * UNIT_SIZE + UNIT_HALF,
+            self.start_positon + block.x * self._unit_size + self._unit_size_half,
+            self.start_positon + self._render_arena_size,
+            block.z * self._unit_size + self._unit_size_half,
         )
         self.no_stroke()
-        self.box(UNIT_SIZE, 0, UNIT_SIZE)
+        self.box(
+            self._unit_size,
+            0,
+            self._unit_size,
+        )
         self.pop()
 
         self.push()
         self.translate(
-            start_position + ARENA_SIZE,
-            start_position + block.y * UNIT_SIZE + UNIT_HALF,
-            block.z * UNIT_SIZE + UNIT_HALF,
+            self.start_positon + self._render_arena_size,
+            self.start_positon + block.y * self._unit_size + self._unit_size_half,
+            block.z * self._unit_size + self._unit_size_half,
         )
         self.no_stroke()
-        self.box(0, UNIT_SIZE, UNIT_SIZE)
+        self.box(
+            0,
+            self._unit_size,
+            self._unit_size,
+        )
         self.pop()
 
     def key_pressed(self):
@@ -683,15 +735,3 @@ class Environment(Sketch):
                 self.generate_video()
 
             self.exit_sketch()
-
-
-# %%
-# agent = Agent("BFS")
-# environment = Environment(agent)
-
-
-# # %%
-# environment.run_sketch()
-# %%
-# score = environment.headless_run()
-# print(score)
