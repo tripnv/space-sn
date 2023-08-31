@@ -1,0 +1,28 @@
+
+window:
+  height: 1914
+  width: 2104
+
+
+environment:
+  frame_rate: 60
+  frame_count_divisor: 15
+  
+  grid_num: 10
+
+  render_options:
+    unit_size: 50
+    render_unit_size: 45
+    block_stroke: false
+    unit_stroke_weight: 0.25
+  
+  video:
+    render_video: false
+    output_folder: "saved"
+    frame_rate: 30
+    
+  info:
+    offset_x: 400
+    offset_y: 0
+
+  gen:
