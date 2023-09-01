@@ -364,7 +364,7 @@ class Environment(Sketch):
 
         return self.snake.length
 
-    def generate_video(self, fps):
+    def generate_video(self):
         """
         Convert images in a folder into a video.
 
@@ -390,8 +390,9 @@ class Environment(Sketch):
             rmtree(path)
             print(f"Directory {path} and its contents have been removed.")
 
-        img_folder = self.output_folder_path
-        output_video = self.output_folder_path + ".mp4"
+        img_folder = self._run_export_path
+        output_video = self._run_export_path + ".mp4"
+
         images = sorted(
             [
                 os.path.join(img_folder, img)
@@ -403,7 +404,9 @@ class Environment(Sketch):
         if not images:
             raise ValueError("No images found in the specified directory!")
 
-        with imageio.get_writer(output_video, mode="I", fps=fps) as writer:
+        with imageio.get_writer(
+            output_video, mode="I", fps=self._render_frame_rate
+        ) as writer:
             for img_path in images:
                 img = Image.open(img_path)
                 img_array = np.array(img)
@@ -411,11 +414,11 @@ class Environment(Sketch):
                 writer.append_data(img_array)
 
         print(f"Video {output_video} created successfully!")
-        delete_folder(self.output_folder_path)
+        delete_folder(self._run_export_path)
 
     def save_frame_to_disk(self):
         self.save_frame(
-            filename=f"{self.output_folder_path}/frame_#####.png",
+            filename=f"{self._run_export_path}/frame_#####.png",
             drop_alpha=False,
             use_thread=True,
             format="png",
@@ -450,8 +453,10 @@ class Environment(Sketch):
 
         self.background(255)
         self.draw_arena()
-        self.draw_snake_head()
-        self.draw_snake_tail()
+
+        self.draw_snake_head(self.snake)
+        self.draw_snake_tail(self.snake)
+
         self.draw_food()
 
         self.display_info(
@@ -463,41 +468,32 @@ class Environment(Sketch):
                 self.generate_video()
             self.exit_sketch()
 
-    def draw_snake_head(self):
+    def draw_snake_head(self, snake):
         # Render head
-        self.draw_location_support(self.snake.head, self._snake_primary_color)
-        self.draw_support_lines_head()
+        self.draw_location_support(snake.head, self._snake_primary_color)
+        self.draw_support_lines_head(snake)
         self.draw_block(
-            self.snake.head,
-            self._render_unit_size,
+            snake.head,
             self._snake_primary_color,
-            self._unit_block_stroke,
-            self._unit_stroke_weight,
         )
 
-    def draw_snake_tail(self):
+    def draw_snake_tail(self, snake):
         # Render tail
-        for tail_block in self.snake.tail:
+        for tail_block in snake.tail:
             self.draw_block(
                 tail_block,
-                self._render_unit_size,
                 self._snake_secondary_color,
-                self._unit_block_stroke,
-                self._unit_stroke_weight,
             )
 
     def draw_food(self):
         # Render food
         self.draw_block(
             self.food,
-            self._render_unit_size,
             self._food_primary_color,
-            self._unit_block_stroke,
-            self._unit_stroke_weight,
         )
         self.draw_location_support(self.food, self._food_secondary_color)
 
-    def draw_block(self, block, block_size, color, no_strokes, stroke_weight=0.25):
+    def draw_block(self, block, block_color):
         """
         Draw a block at a specific position with specified visuals.
 
@@ -507,9 +503,8 @@ class Environment(Sketch):
         :param no_strokes: If True, the block will have no outline.
         """
         self.push()
-        if color:
-            self.fill(color)
-        if no_strokes:
+        self.fill(block_color)
+        if self._unit_block_stroke:
             self.no_stroke()
 
         self.translate(
@@ -517,8 +512,8 @@ class Environment(Sketch):
             self._origon + block.y * self._unit_size + self._unit_size_half,
             block.z * self._unit_size + self._unit_size_half,
         )
-        self.stroke_weight(0.25)
-        self.box(block_size)
+        self.stroke_weight(self._unit_stroke_weight)
+        self.box(self._render_unit_size)
 
         self.pop()
 
@@ -572,8 +567,6 @@ class Environment(Sketch):
         min_z = 0
         max_z = self._render_arena_size
 
-        grid_size = self._render_arena_size // self._grid_num
-
         self.push()
         self.stroke_weight(self._grid_stroke_weight)
 
@@ -605,36 +598,36 @@ class Environment(Sketch):
 
         self.pop()
 
-    def draw_support_lines_head(self):
+    def draw_support_lines_head(self, snake):
         """
         Draw supporting visual lines that extend from the snake's head to the arena boundaries.
         """
         self.push()
         self.line(
-            self._origon + self.snake.head.x * self._unit_size + self._unit_size_half,
-            self._origon + self.snake.head.y * self._unit_size + self._unit_size_half,
-            self.snake.head.z * self._unit_size + self._unit_size_half,
+            self._origon + snake.head.x * self._unit_size + self._unit_size_half,
+            self._origon + snake.head.y * self._unit_size + self._unit_size_half,
+            snake.head.z * self._unit_size + self._unit_size_half,
             self._origon + self._render_arena_size,
-            self._origon + self.snake.head.y * self._unit_size + self._unit_size_half,
-            self.snake.head.z * self._unit_size + self._unit_size_half,
+            self._origon + snake.head.y * self._unit_size + self._unit_size_half,
+            snake.head.z * self._unit_size + self._unit_size_half,
         )
 
         self.line(
-            self._origon + self.snake.head.x * self._unit_size + self._unit_size_half,
-            self._origon + self.snake.head.y * self._unit_size + self._unit_size_half,
-            self.snake.head.z * self._unit_size + self._unit_size_half,
-            self._origon + self.snake.head.x * self._unit_size + self._unit_size_half,
+            self._origon + snake.head.x * self._unit_size + self._unit_size_half,
+            self._origon + snake.head.y * self._unit_size + self._unit_size_half,
+            snake.head.z * self._unit_size + self._unit_size_half,
+            self._origon + snake.head.x * self._unit_size + self._unit_size_half,
             self._origon + self._render_arena_size,
-            self.snake.head.z * self._unit_size + self._unit_size_half,
+            snake.head.z * self._unit_size + self._unit_size_half,
         )
 
         self.line(
-            self._origon + self.snake.head.x * self._unit_size + self._unit_size_half,
-            self._origon + self.snake.head.y * self._unit_size + self._unit_size_half,
+            self._origon + snake.head.x * self._unit_size + self._unit_size_half,
+            self._origon + snake.head.y * self._unit_size + self._unit_size_half,
             self.snake.head.z,
-            self._origon + self.snake.head.x * self._unit_size + self._unit_size_half,
-            self._origon + self.snake.head.y * self._unit_size + self._unit_size_half,
-            self.snake.head.z * self._unit_size + self._unit_size_half,
+            self._origon + snake.head.x * self._unit_size + self._unit_size_half,
+            self._origon + snake.head.y * self._unit_size + self._unit_size_half,
+            snake.head.z * self._unit_size + self._unit_size_half,
         )
         self.pop()
 
