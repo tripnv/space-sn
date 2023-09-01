@@ -17,7 +17,7 @@ environment:
     unit_stroke_weight: 0.25
   
   video:
-    render_video: false
+    render_video: true
     output_folder: "saved"
     frame_rate: 30
     
