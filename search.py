@@ -233,7 +233,7 @@ class Agent:
         and h(x) returns the distance to the end_node
         """
         gx = self.calculate_euclidean_distance(start_node, current_node)
-        hx = self.calculate_euclidean_distance(current_node, end_node)
+        hx = self.calculate_manhattan_distance(current_node, end_node)
         return gx + hx
 
     def fx_greedy(self, _, current_node, end_node):
