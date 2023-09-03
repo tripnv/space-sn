@@ -536,8 +536,8 @@ class Environment(Sketch):
 
         for i, (text, value) in enumerate(metrics.items()):
             self.push()
-            self.fill(self.color(0, 0, 0))
-            self.text_size(32)
+            self.fill(self.color(100, 100, 100))
+            self.text_size(24)
             self.text(
                 f"""{text}: {value:.2f}"""
                 if not text == "agent-type"
@@ -570,24 +570,32 @@ class Environment(Sketch):
         # Y plane
         self.stroke(self._some_stroke_value)
 
-        for y in grids_xy:
+        # for y in grids_xy:
+        #     self.line(min_x, y, min_z, max_x, y, min_z)
+
+        # for x in grids_xy:
+        #     self.line(x, min_y, min_z, x, max_y, min_z)
+
+        # # Z Plane
+        # for y in grids_xy:
+        #     self.line(max_x, y, min_z, max_x, y, max_z)
+
+        # for z in grids_z:
+        #     self.line(max_x, min_y, z, max_x, max_y, z)
+
+        # # X Plane
+        # for x in grids_xy:
+        #     self.line(x, max_y, min_z, x, max_y, max_z)
+
+        # for z in grids_z:
+        #     self.line(min_x, max_y, z, max_x, max_y, z)
+
+        for x, y, z in zip(grids_xy, grids_xy, grids_z):
             self.line(min_x, y, min_z, max_x, y, min_z)
-
-        for x in grids_xy:
             self.line(x, min_y, min_z, x, max_y, min_z)
-
-        # Z Plane
-        for y in grids_xy:
             self.line(max_x, y, min_z, max_x, y, max_z)
-
-        for z in grids_z:
             self.line(max_x, min_y, z, max_x, max_y, z)
-
-        # X Plane
-        for x in grids_xy:
             self.line(x, max_y, min_z, x, max_y, max_z)
-
-        for z in grids_z:
             self.line(min_x, max_y, z, max_x, max_y, z)
 
         self.pop()
