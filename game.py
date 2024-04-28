@@ -339,6 +339,9 @@ class Environment(Sketch):
             if self.frame_count % self._frame_count_divisor == 0:
                 self.step(self.snake.head_direction)
 
+
+
+
     def check_food_collision(self):
         """
         Check if the snake has collided with the food and handle the collision.
@@ -347,6 +350,7 @@ class Environment(Sketch):
             self.snake.state = 1  # Signaling that the snake ate an apple
             self.food = self.generate_empty_block()
 
+    ### Separate sketch environment 
     def run_headless(self):
         """
         Execute the snake's movement without rendering the graphical interface.
