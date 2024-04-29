@@ -140,7 +140,7 @@ class Snake:
 
         :param initial_block: The initial block representing the snake's head.
         """
-        self.head = initial_block
+        self.head = self.generate_initial_block()
         self.head_direction: tuple = self.directions[
             np.random.choice(list(self.directions.keys()))
         ]
@@ -153,6 +153,14 @@ class Snake:
         self.length: int = 1
         # List of snake blocks
         self.tail: List[Block] = []
+
+    # def generate_initial_direction(self):
+
+
+
+    def generate_initial_block(self):
+        random_position = np.random.randint(0, config['environment']['grid_num'], size = 3)
+        return Block(random_position[0], random_position[1], random_position[2])
 
     def snake_blocks_as_list(self) -> List[tuple]:
         """
@@ -214,6 +222,13 @@ class Snake:
             if any(self.head.__eq___(tail_block) for tail_block in self.tail):
                 self.status = False
 
+    def check_food_collision(self, food):
+        """
+        Check if the snake has collided with the food and handle the collision.
+        """
+        if self.head.__eq__(food):
+            self.state = 1  # Signaling that the snake ate an apple
+            self.food.generate_empty_block(self.snake)
 
         # collision = False
         # if self.length > 1:
@@ -223,6 +238,29 @@ class Snake:
         #         if self.head.__eq__(self.tail[tail_idx]):
         #             self.status = False
         #         tail_idx += 1
+
+class Food:
+    def __init__(self, snake) -> None:
+        self.position = self.generate_empty_block(snake)
+
+    
+    def generate_empty_block(self, snake):
+        """
+        Generate a block position in the grid that is currently empty.
+
+        :return: Block object representing an empty block in the grid.
+        """
+        if snake.tail:
+            tail_set = set([block.as_tuple() for block in self.snake.tail])
+            tail_set.add(snake.head.as_tuple())
+        else:
+            tail_set = set(snake.head.as_tuple())
+        empty_x, empty_y, empty_z = choice(
+            list(candidate_coordinates.difference(tail_set))
+        )
+        empty_block = Block(empty_x, empty_y, empty_z)
+
+        self.position = empty_block
 
 
 # %%
@@ -248,7 +286,8 @@ class Environment(gymnasium.Env):
         self.min_sl = 100
 
         self.snake = Snake(Block(5, 5, 5), self._grid_num)
-        self.food = self.generate_empty_block()
+        self.food = Food(self.snake)
+
 
     def step(self, action: ActType) -> tuple[ObsType, SupportsFloat, bool, bool, dict[str, Any]]:
         """
@@ -267,25 +306,9 @@ class Environment(gymnasium.Env):
         # self.space_representation = np.zeros((self._grid_num, self.grid_num, self.grid_num))
         self.snake = Snake(Block(5, 5, 5))
         # self.update_space_representation()
-        self.food = self.generate_empty_block()
+        self.food = generate_empty_block(self.snake)
 
-    def generate_empty_block(self):
-        """
-        Generate a block position in the grid that is currently empty.
 
-        :return: Block object representing an empty block in the grid.
-        """
-        if self.snake.tail:
-            tail_set = set([block.as_tuple() for block in self.snake.tail])
-            tail_set.add(self.snake.head.as_tuple())
-        else:
-            tail_set = set(self.snake.head.as_tuple())
-        empty_x, empty_y, empty_z = choice(
-            list(candidate_coordinates.difference(tail_set))
-        )
-        empty_block = Block(empty_x, empty_y, empty_z)
-
-        return empty_block
 
 
 
@@ -311,13 +334,7 @@ class Environment(gymnasium.Env):
 
 
 
-    def check_food_collision(self):
-        """
-        Check if the snake has collided with the food and handle the collision.
-        """
-        if self.snake.head.__eq__(self.food):
-            self.snake.state = 1  # Signaling that the snake ate an apple
-            self.food = self.generate_empty_block()
+
 
 
 
