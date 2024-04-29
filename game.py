@@ -85,6 +85,7 @@ class Block:
         :param other: another Block object.
         :return: True if coordinates are the same, otherwise False.
         """
+    
         if not isinstance(other, Block):
             raise ValueError
         return (self.x, self.y, self.z) == (other.x, other.y, other.z)
@@ -202,21 +203,26 @@ class Snake:
         """
         if any(0 < coordinate or coordinate == self._arena_grid_num for coordinate in self.head.as_list()):
             self.status = False
-        
+
 
     def check_self_collision(self) -> None:
         """
         Check for collision between the updated snake's head and any part of its tail.
         If there's a collision, set the snake's status to dead.
         """
-        collision = False
-        if self.length > 1:
-            tail_len = self.length - 1
-            tail_idx = 0
-            while (not collision) and tail_idx < tail_len:
-                if self.head.__eq__(self.tail[tail_idx]):
-                    self.status = False
-                tail_idx += 1
+        if self.tail:
+            if any(self.head.__eq___(tail_block) for tail_block in self.tail):
+                self.status = False
+
+
+        # collision = False
+        # if self.length > 1:
+        #     tail_len = self.length - 1
+        #     tail_idx = 0
+        #     while (not collision) and tail_idx < tail_len:
+        #         if self.head.__eq__(self.tail[tail_idx]):
+        #             self.status = False
+        #         tail_idx += 1
 
 
 # %%
