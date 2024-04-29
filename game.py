@@ -134,33 +134,44 @@ class Snake:
         z_backward=(0, 0, -1),
     )
 
-    def __init__(self, initial_block, grid_num) -> None:
+    def __init__(self, grid_num = config['environment']['grid_num']) -> None:
         """
         Initialize the Snake object with an initial block.
 
         :param initial_block: The initial block representing the snake's head.
         """
-        self.head = self.generate_initial_block()
-        self.head_direction: tuple = self.directions[
-            np.random.choice(list(self.directions.keys()))
-        ]
+        self.reset()
         self._arena_grid_num = grid_num
+    
+    def reset(self):
+        self.generate_initial_block()
+        self.generate_initial_direction()
+        
         # Alive status
         self.status: bool = True
+        
         # Signaling eating
         self.state: bool = 0
+        
         # Snake length
         self.length: int = 1
+        
         # List of snake blocks
         self.tail: List[Block] = []
 
-    # def generate_initial_direction(self):
+
+
+
+    def generate_initial_direction(self):
+        self.head_direction = self.directions[
+            np.random.choice(list(self.directions.keys()))
+        ]
 
 
 
     def generate_initial_block(self):
         random_position = np.random.randint(0, config['environment']['grid_num'], size = 3)
-        return Block(random_position[0], random_position[1], random_position[2])
+        self.head = Block(random_position[0], random_position[1], random_position[2])
 
     def snake_blocks_as_list(self) -> List[tuple]:
         """
@@ -247,11 +258,12 @@ class Food:
     def generate_empty_block(self, snake):
         """
         Generate a block position in the grid that is currently empty.
+        Food position can be obtained as a function of the snake block positions
 
         :return: Block object representing an empty block in the grid.
         """
         if snake.tail:
-            tail_set = set([block.as_tuple() for block in self.snake.tail])
+            tail_set = set([block.as_tuple() for block in snake.tail])
             tail_set.add(snake.head.as_tuple())
         else:
             tail_set = set(snake.head.as_tuple())
@@ -261,6 +273,7 @@ class Food:
         empty_block = Block(empty_x, empty_y, empty_z)
 
         self.position = empty_block
+    
 
 
 # %%
@@ -304,9 +317,11 @@ class Environment(gymnasium.Env):
         Reset the environment to an initial state.
         """
         # self.space_representation = np.zeros((self._grid_num, self.grid_num, self.grid_num))
-        self.snake = Snake(Block(5, 5, 5))
+        self.snake.reset()
+
         # self.update_space_representation()
-        self.food = generate_empty_block(self.snake)
+        self.food.generate_empty_block(self.snake)
+
 
 
 
