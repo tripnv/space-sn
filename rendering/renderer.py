@@ -227,7 +227,7 @@ class Renderer:
             self._head_loc_yz.visible = True
 
             # Location supports — food
-            self._food_loc_xy.local.position = (fx, fy, 0)
+            self._food_loc_xy.local.position = (fx, fy, arena)
             self._food_loc_xz.local.position = (fx, 0, fz)
             self._food_loc_yz.local.position = (arena, fy, fz)
             self._food_loc_xy.visible = True
