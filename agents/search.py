@@ -1,0 +1,251 @@
+from __future__ import annotations
+
+from collections import deque
+from itertools import product
+
+import numpy as np
+
+from core.types import GameState, ACTIONS
+
+# Direction tuple → action index lookup
+_DIR_TO_ACTION = {tuple(int(x) for x in ACTIONS[i]): i for i in range(6)}
+
+
+def _build_adjacency(grid_num: int) -> dict[tuple, list[tuple]]:
+    directions = [(-1, 0, 0), (1, 0, 0), (0, -1, 0), (0, 1, 0), (0, 0, 1), (0, 0, -1)]
+    adj: dict[tuple, list[tuple]] = {}
+    for pos in product(range(grid_num), repeat=3):
+        adj[pos] = []
+        for d in directions:
+            adj[pos].append((pos[0] + d[0], pos[1] + d[1], pos[2] + d[2]))
+    return adj
+
+
+class _Node:
+    __slots__ = ("position", "parent", "action")
+
+    def __init__(self, position: tuple, parent: _Node | None = None):
+        self.position = position
+        self.parent = parent
+        self.action: int | None = None
+        if parent is not None:
+            dx = position[0] - parent.position[0]
+            dy = position[1] - parent.position[1]
+            dz = position[2] - parent.position[2]
+            self.action = _DIR_TO_ACTION[(dx, dy, dz)]
+
+    def __eq__(self, other):
+        return isinstance(other, _Node) and self.position == other.position
+
+    def __hash__(self):
+        return hash(self.position)
+
+    def __repr__(self):
+        return f"Node{self.position}"
+
+
+def _unwrap_path(node: _Node) -> deque[int]:
+    actions: deque[int] = deque()
+    while node.parent is not None:
+        actions.appendleft(node.action)
+        node = node.parent
+    return actions
+
+
+def _valid(pos: tuple, grid_num: int) -> bool:
+    return all(0 <= c < grid_num for c in pos)
+
+
+class _SearchBase:
+    """Shared logic for all graph-search agents."""
+
+    def __init__(self, grid_num: int = 10):
+        self.grid_num = grid_num
+        self._adj = _build_adjacency(grid_num)
+        self._action_queue: deque[int] = deque()
+
+    def act(self, state: GameState) -> int:
+        if not self._action_queue:
+            self._action_queue = self._plan(state)
+        if self._action_queue:
+            return self._action_queue.popleft()
+        # Fallback: pick any non-occupied neighbour, or just go somewhere to die
+        return self._fallback(state)
+
+    def _plan(self, state: GameState) -> deque[int]:
+        raise NotImplementedError
+
+    def _occupied_set(self, state: GameState) -> set[tuple]:
+        body = np.asarray(state.body)
+        length = int(state.length)
+        return {tuple(body[i]) for i in range(length)}
+
+    def _fallback(self, state: GameState) -> int:
+        head = tuple(int(x) for x in np.asarray(state.body[0]))
+        occupied = self._occupied_set(state)
+        for neighbour in self._adj[head]:
+            if _valid(neighbour, self.grid_num) and neighbour not in occupied:
+                dx = neighbour[0] - head[0]
+                dy = neighbour[1] - head[1]
+                dz = neighbour[2] - head[2]
+                return _DIR_TO_ACTION[(dx, dy, dz)]
+        return 0  # no safe move — will die
+
+
+class BFSAgent(_SearchBase):
+    agent_type = "BFS"
+
+    def _plan(self, state: GameState) -> deque[int]:
+        head = tuple(int(x) for x in np.asarray(state.body[0]))
+        goal = tuple(int(x) for x in np.asarray(state.food))
+        occupied = self._occupied_set(state)
+
+        start = _Node(head)
+        if head == goal:
+            return deque()
+
+        frontier: deque[_Node] = deque([start])
+        explored: set[_Node] = set()
+
+        while frontier:
+            current = frontier.popleft()
+            explored.add(current)
+
+            for neighbour_pos in self._adj[current.position]:
+                child = _Node(neighbour_pos, parent=current)
+                if (
+                    _valid(neighbour_pos, self.grid_num)
+                    and _Node(neighbour_pos) not in occupied
+                    and child not in explored
+                    and child not in frontier
+                ):
+                    if neighbour_pos == goal:
+                        return _unwrap_path(child)
+                    frontier.append(child)
+
+        return deque()
+
+
+class DFSAgent(_SearchBase):
+    agent_type = "DFS"
+
+    def _plan(self, state: GameState) -> deque[int]:
+        head = tuple(int(x) for x in np.asarray(state.body[0]))
+        goal = tuple(int(x) for x in np.asarray(state.food))
+        occupied = self._occupied_set(state)
+
+        start = _Node(head)
+        if head == goal:
+            return deque()
+
+        frontier: list[_Node] = [start]
+        explored: set[_Node] = set()
+
+        while frontier:
+            current = frontier.pop()
+            if current.position == goal:
+                return _unwrap_path(current)
+            explored.add(current)
+
+            for neighbour_pos in self._adj[current.position]:
+                child = _Node(neighbour_pos, parent=current)
+                if (
+                    _valid(neighbour_pos, self.grid_num)
+                    and _Node(neighbour_pos) not in occupied
+                    and child not in explored
+                    and child not in frontier
+                ):
+                    frontier.append(child)
+
+        return deque()
+
+
+class BestFirstAgent(_SearchBase):
+    agent_type = "BEST-FIRST"
+
+    def _plan(self, state: GameState) -> deque[int]:
+        head = tuple(int(x) for x in np.asarray(state.body[0]))
+        goal = tuple(int(x) for x in np.asarray(state.food))
+        occupied = self._occupied_set(state)
+
+        start = _Node(head)
+        if head == goal:
+            return deque()
+
+        result = self._recursive_best_first(start, goal, occupied, set())
+        if result is not None:
+            return _unwrap_path(result)
+        return deque()
+
+    def _heuristic(self, pos: tuple, goal: tuple) -> float:
+        return sum((a - b) ** 2 for a, b in zip(pos, goal)) ** 0.5
+
+    def _recursive_best_first(
+        self, current: _Node, goal: tuple, occupied: set, explored: set
+    ) -> _Node | None:
+        if current.position == goal:
+            return current
+        explored.add(current)
+
+        children = []
+        for neighbour_pos in self._adj[current.position]:
+            child = _Node(neighbour_pos, parent=current)
+            if (
+                _valid(neighbour_pos, self.grid_num)
+                and _Node(neighbour_pos) not in occupied
+                and child not in explored
+            ):
+                children.append(child)
+
+        if not children:
+            return None
+
+        children.sort(key=lambda n: self._heuristic(n.position, goal))
+        return self._recursive_best_first(children[0], goal, occupied, explored)
+
+
+class AStarAgent(_SearchBase):
+    agent_type = "ASTAR"
+
+    def _plan(self, state: GameState) -> deque[int]:
+        head = tuple(int(x) for x in np.asarray(state.body[0]))
+        goal = tuple(int(x) for x in np.asarray(state.food))
+        occupied = self._occupied_set(state)
+
+        start = _Node(head)
+        if head == goal:
+            return deque()
+
+        result = self._recursive_best_first(start, start, goal, occupied, set())
+        if result is not None:
+            return _unwrap_path(result)
+        return deque()
+
+    def _heuristic(self, start: tuple, current: tuple, goal: tuple) -> float:
+        # f(x) = g(x) + h(x)
+        gx = sum((a - b) ** 2 for a, b in zip(start, current)) ** 0.5
+        hx = sum(abs(a - b) for a, b in zip(current, goal))
+        return gx + hx
+
+    def _recursive_best_first(
+        self, start: _Node, current: _Node, goal: tuple, occupied: set, explored: set
+    ) -> _Node | None:
+        if current.position == goal:
+            return current
+        explored.add(current)
+
+        children = []
+        for neighbour_pos in self._adj[current.position]:
+            child = _Node(neighbour_pos, parent=current)
+            if (
+                _valid(neighbour_pos, self.grid_num)
+                and _Node(neighbour_pos) not in occupied
+                and child not in explored
+            ):
+                children.append(child)
+
+        if not children:
+            return None
+
+        children.sort(key=lambda n: self._heuristic(start.position, n.position, goal))
+        return self._recursive_best_first(start, children[0], goal, occupied, explored)
