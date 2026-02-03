@@ -9,19 +9,24 @@ import jax.numpy as jnp
 from config import load_config
 from core.engine import reset, step
 from agents.search import BFSAgent, DFSAgent, BestFirstAgent, AStarAgent
+from agents.jax_search import JAXBFSAgent, JAXDFSAgent, JAXBestFirstAgent, JAXAStarAgent
 
 AGENTS = {
     "bfs": BFSAgent,
     "dfs": DFSAgent,
     "best-first": BestFirstAgent,
     "astar": AStarAgent,
+    "jax-bfs": JAXBFSAgent,
+    "jax-dfs": JAXDFSAgent,
+    "jax-best-first": JAXBestFirstAgent,
+    "jax-astar": JAXAStarAgent,
 }
 
 
 @click.command()
 @click.option(
     "--agent", "-a",
-    type=click.Choice(["bfs", "dfs", "best-first", "astar"]),
+    type=click.Choice(["bfs", "dfs", "best-first", "astar", "jax-bfs", "jax-dfs", "jax-best-first", "jax-astar"]),
     default="bfs",
     help="Search agent type.",
 )
