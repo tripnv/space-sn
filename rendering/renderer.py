@@ -266,6 +266,13 @@ class Renderer:
         self._renderer.render(self._scene, self._camera)
         self._canvas.request_draw()
 
+    def snapshot(self):
+        """Return the current frame as an RGBA uint8 numpy array, or None."""
+        snap = self._renderer.snapshot()
+        if snap is not None and snap.dtype == np.uint8:
+            return snap
+        return None
+
     def close(self):
         self._canvas.close()
 

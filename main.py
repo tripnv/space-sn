@@ -34,7 +34,9 @@ AGENTS = {
 @click.option("--grid-num", "-g", type=int, default=None, help="Grid size per axis (default from config).")
 @click.option("--seed", "-s", type=int, default=0, help="Random seed.")
 @click.option("--max-steps", type=int, default=10_000, help="Max steps before stopping.")
-def run(agent: str, mode: str, grid_num: int | None, seed: int, max_steps: int):
+@click.option("--record", "-r", type=click.Path(), default=None, help="Record to gif (e.g. samples/out.gif).")
+@click.option("--record-frames", type=int, default=300, help="Number of frames to record.")
+def run(agent: str, mode: str, grid_num: int | None, seed: int, max_steps: int, record: str | None, record_frames: int):
     """Space Snake — JAX-powered 3D snake with search agents."""
     cfg = load_config()
     grid_num = grid_num or cfg["environment"]["grid_num"]
@@ -49,7 +51,10 @@ def run(agent: str, mode: str, grid_num: int | None, seed: int, max_steps: int):
     agent_obj = AGENTS[agent](grid_num=grid_num)
     click.echo(f"agent: {agent_obj.agent_type}  grid: {grid_num}  mode: {mode}")
 
-    if mode == "headless":
+    if record:
+        _run_record(state, agent_obj, step_jit, grid_num, max_steps, agent_name=agent,
+                     out_path=record, num_frames=record_frames)
+    elif mode == "headless":
         _run_headless(state, agent_obj, step_jit, grid_num, max_steps)
     else:
         _run_render(state, agent_obj, step_jit, grid_num, max_steps, agent_name=agent)
@@ -68,6 +73,39 @@ def _run_headless(state, agent_obj, step_jit, grid_num, max_steps):
         f"score: {int(state.score)}  length: {int(state.length)}  "
         f"steps: {steps}  time: {elapsed:.2f}s"
     )
+
+
+def _run_record(state, agent_obj, step_jit, grid_num, max_steps, agent_name="",
+                 out_path="out.gif", num_frames=300):
+    from pathlib import Path
+    from PIL import Image
+    from rendering.renderer import Renderer
+
+    renderer = Renderer(grid_num=grid_num, agent_name=agent_name)
+    frames: list[Image.Image] = []
+    steps = 0
+
+    for _ in range(num_frames):
+        if not bool(state.alive) or steps >= max_steps:
+            break
+        action = agent_obj.act(state)
+        state = step_jit(state, jnp.int32(action), grid_num)
+        steps += 1
+        renderer.update(state)
+        snap = renderer.snapshot()
+        if snap is not None:
+            frames.append(Image.fromarray(snap))
+
+    if frames:
+        out = Path(out_path)
+        out.parent.mkdir(parents=True, exist_ok=True)
+        frames[0].save(out, save_all=True, append_images=frames[1:],
+                        duration=33, loop=0, optimize=True)
+        click.echo(f"saved {len(frames)} frames to {out}")
+    else:
+        click.echo("no frames captured")
+
+    click.echo(f"score: {int(state.score)}  length: {int(state.length)}  steps: {steps}")
 
 
 def _run_render(state, agent_obj, step_jit, grid_num, max_steps, agent_name=""):
