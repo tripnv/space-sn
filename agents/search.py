@@ -143,6 +143,8 @@ class DFSAgent(_SearchBase):
 
         while frontier:
             current = frontier.pop()
+            if current in explored:
+                continue
             if current.position == goal:
                 return _unwrap_path(current)
             explored.add(current)
@@ -153,7 +155,6 @@ class DFSAgent(_SearchBase):
                     _valid(neighbour_pos, self.grid_num)
                     and neighbour_pos not in occupied
                     and child not in explored
-                    and child not in frontier
                 ):
                     frontier.append(child)
 
