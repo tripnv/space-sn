@@ -41,11 +41,11 @@ class Renderer:
         self._scene = gfx.Scene()
         self._scene.add(gfx.Background(material=gfx.BackgroundMaterial((1, 1, 1, 1))))
 
-        # Camera — at the open corner (low x, low y, high z) looking into the 3 walls
+        # Camera — elevated, looking down into the open corner of the arena
         center = self._arena_size / 2
         a = self._arena_size
         self._camera = gfx.PerspectiveCamera(fov=60)
-        self._camera.local.position = (center - a, center - a * 0.3, center + a)
+        self._camera.local.position = (center - a * 0.8, center + a * 1.2, center - a * 0.8)
         self._camera.look_at((center, center, center))
         self._controller = gfx.OrbitController()
         self._controller.add_camera(self._camera)
@@ -67,7 +67,7 @@ class Renderer:
 
     # ------------------------------------------------------------------ arena
     def _build_arena(self):
-        """Wireframe grid on 3 faces: xy at z=0, xz at y=max, yz at x=max."""
+        """Wireframe grid on 3 faces: xy at z=max, xz at y=max, yz at x=max."""
         positions = []
         n = self.grid_num
         s = self.unit_size
@@ -75,9 +75,9 @@ class Renderer:
 
         for i in range(n + 1):
             v = i * s
-            # xy face (z=0)
-            positions.extend([(0, v, 0), (arena, v, 0)])
-            positions.extend([(v, 0, 0), (v, arena, 0)])
+            # xy face (z=max)
+            positions.extend([(0, v, arena), (arena, v, arena)])
+            positions.extend([(v, 0, arena), (v, arena, arena)])
             # xz face (y=max)
             positions.extend([(0, arena, v), (arena, arena, v)])
             positions.extend([(v, arena, 0), (v, arena, arena)])
@@ -210,16 +210,16 @@ class Renderer:
             self._food_mesh.local.position = (fx, fy, fz)
             self._food_mesh.visible = True
 
-            # Support lines: head → +x wall, head → +y wall, head → z=0 wall
+            # Support lines: head → +x wall, head → +y wall, head → +z wall
             support_pts = np.array([
                 [hx, hy, hz], [arena, hy, hz],   # to +x wall
                 [hx, hy, hz], [hx, arena, hz],   # to +y wall
-                [hx, hy, hz], [hx, hy, 0],       # to z=0 wall
+                [hx, hy, hz], [hx, hy, arena],   # to +z wall
             ], dtype=np.float32)
             self._support_lines.geometry.positions = gfx.Buffer(support_pts)
 
             # Location supports — head
-            self._head_loc_xy.local.position = (hx, hy, 0)
+            self._head_loc_xy.local.position = (hx, hy, arena)
             self._head_loc_xz.local.position = (hx, arena, hz)
             self._head_loc_yz.local.position = (arena, hy, hz)
             self._head_loc_xy.visible = True
@@ -227,7 +227,7 @@ class Renderer:
             self._head_loc_yz.visible = True
 
             # Location supports — food
-            self._food_loc_xy.local.position = (fx, fy, 0)
+            self._food_loc_xy.local.position = (fx, fy, arena)
             self._food_loc_xz.local.position = (fx, arena, fz)
             self._food_loc_yz.local.position = (arena, fy, fz)
             self._food_loc_xy.visible = True
