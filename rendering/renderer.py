@@ -1,0 +1,262 @@
+from __future__ import annotations
+
+import time
+
+import numpy as np
+import pygfx as gfx
+from rendercanvas.auto import RenderCanvas, loop
+
+from core.types import GameState
+
+
+class Renderer:
+    """pygfx 3D renderer that replicates the original py5 visuals.
+
+    Creates a window with:
+    - Wireframe arena grid on 3 faces
+    - Translucent snake cubes (green head, yellow-green tail)
+    - Red food cube
+    - Support lines from head to arena walls
+    - Location support highlights on arena faces
+    - HUD text overlay
+    """
+
+    def __init__(self, grid_num: int = 10, unit_size: float = 1.0):
+        self.grid_num = grid_num
+        self.unit_size = unit_size
+        self.max_length = grid_num ** 3
+        self._arena_size = grid_num * unit_size
+        self._half = unit_size / 2
+        self._cube_scale = unit_size * 0.9  # slightly smaller than cell
+
+        self._start_time = time.time()
+        self._frame_count = 0
+
+        # Canvas and renderer
+        self._canvas = RenderCanvas(size=(1024, 768), title="Space Snake")
+        self._renderer = gfx.renderers.WgpuRenderer(self._canvas)
+
+        # Scene
+        self._scene = gfx.Scene()
+
+        # Camera
+        center = self._arena_size / 2
+        self._camera = gfx.PerspectiveCamera(fov=60)
+        self._camera.local.position = (center + self._arena_size, center, center + self._arena_size)
+        self._camera.look_at((center, center, center))
+        self._controller = gfx.OrbitController()
+        self._controller.add_camera(self._camera)
+        self._controller.register_events(self._renderer)
+
+        # Ambient + directional light
+        self._scene.add(gfx.AmbientLight(intensity=0.5))
+        light = gfx.DirectionalLight(intensity=0.8)
+        light.local.position = (self._arena_size * 2, self._arena_size * 2, self._arena_size * 2)
+        self._scene.add(light)
+
+        # Build scene objects
+        self._build_arena()
+        self._build_snake()
+        self._build_food()
+        self._build_support_lines()
+        self._build_location_supports()
+        self._build_hud()
+
+    # ------------------------------------------------------------------ arena
+    def _build_arena(self):
+        """Wireframe grid on 3 faces: xy at z=0, xz at y=max, yz at x=max."""
+        positions = []
+        n = self.grid_num
+        s = self.unit_size
+        arena = self._arena_size
+
+        for i in range(n + 1):
+            v = i * s
+            # xy face (z=0)
+            positions.extend([(0, v, 0), (arena, v, 0)])
+            positions.extend([(v, 0, 0), (v, arena, 0)])
+            # xz face (y=max)
+            positions.extend([(0, arena, v), (arena, arena, v)])
+            positions.extend([(v, arena, 0), (v, arena, arena)])
+            # yz face (x=max)
+            positions.extend([(arena, 0, v), (arena, arena, v)])
+            positions.extend([(arena, v, 0), (arena, v, arena)])
+
+        positions = np.array(positions, dtype=np.float32)
+        geo = gfx.Geometry(positions=positions)
+        mat = gfx.LineSegmentMaterial(color=(0.6, 0.6, 0.6, 1.0), thickness=1.0)
+        self._arena_lines = gfx.Line(geo, mat)
+        self._scene.add(self._arena_lines)
+
+    # ------------------------------------------------------------------ snake
+    def _build_snake(self):
+        """InstancedMesh for snake body cubes."""
+        cube_geo = gfx.box_geometry(self._cube_scale, self._cube_scale, self._cube_scale)
+
+        # Head: green translucent
+        head_mat = gfx.MeshPhongMaterial(color=(0.0, 1.0, 0.0, 0.35))
+        head_mat.side = "both"
+        self._head_mesh = gfx.Mesh(cube_geo, head_mat)
+        self._scene.add(self._head_mesh)
+
+        # Tail: yellow-green translucent, instanced
+        tail_mat = gfx.MeshPhongMaterial(color=(0.78, 1.0, 0.0, 0.45))
+        tail_mat.side = "both"
+        self._tail_mesh = gfx.InstancedMesh(cube_geo, tail_mat, self.max_length)
+        # Zero all instance matrices so unused slots are invisible
+        self._tail_mesh.instance_buffer.data["matrix"] = 0
+        self._tail_mesh.instance_buffer.update_full()
+        self._tail_mesh.visible = False
+        self._scene.add(self._tail_mesh)
+
+    # ------------------------------------------------------------------ food
+    def _build_food(self):
+        cube_geo = gfx.box_geometry(self._cube_scale, self._cube_scale, self._cube_scale)
+        food_mat = gfx.MeshPhongMaterial(color=(1.0, 0.0, 0.0, 0.45))
+        food_mat.side = "both"
+        self._food_mesh = gfx.Mesh(cube_geo, food_mat)
+        self._scene.add(self._food_mesh)
+
+    # --------------------------------------------------------- support lines
+    def _build_support_lines(self):
+        """3 lines from head to arena walls (+x, +y, -z)."""
+        # Placeholder positions; updated each frame
+        positions = np.zeros((6, 3), dtype=np.float32)
+        geo = gfx.Geometry(positions=positions)
+        mat = gfx.LineSegmentMaterial(color=(0.5, 0.5, 0.5, 0.5), thickness=1.0)
+        self._support_lines = gfx.Line(geo, mat)
+        self._scene.add(self._support_lines)
+
+    # --------------------------------------------------- location supports
+    def _build_location_supports(self):
+        """Flat highlight boxes on the 3 arena faces for head and food."""
+        s = self.unit_size
+        thin = 0.01
+
+        # Geometries for each face orientation
+        self._loc_geo_xy = gfx.box_geometry(s, s, thin)  # flat in z
+        self._loc_geo_xz = gfx.box_geometry(s, thin, s)  # flat in y
+        self._loc_geo_yz = gfx.box_geometry(thin, s, s)  # flat in x
+
+        # Head location supports (green)
+        head_loc_mat = gfx.MeshPhongMaterial(color=(0.0, 1.0, 0.0, 0.15))
+        head_loc_mat.side = "both"
+        self._head_loc_xy = gfx.Mesh(self._loc_geo_xy, head_loc_mat)
+        self._head_loc_xz = gfx.Mesh(self._loc_geo_xz, head_loc_mat)
+        self._head_loc_yz = gfx.Mesh(self._loc_geo_yz, head_loc_mat)
+        self._scene.add(self._head_loc_xy, self._head_loc_xz, self._head_loc_yz)
+
+        # Food location supports (red)
+        food_loc_mat = gfx.MeshPhongMaterial(color=(1.0, 0.0, 0.0, 0.1))
+        food_loc_mat.side = "both"
+        self._food_loc_xy = gfx.Mesh(self._loc_geo_xy, food_loc_mat)
+        self._food_loc_xz = gfx.Mesh(self._loc_geo_xz, food_loc_mat)
+        self._food_loc_yz = gfx.Mesh(self._loc_geo_yz, food_loc_mat)
+        self._scene.add(self._food_loc_xy, self._food_loc_xz, self._food_loc_yz)
+
+    # ------------------------------------------------------------------- hud
+    def _build_hud(self):
+        self._hud_text = gfx.Text(
+            text="score: 0 | length: 1 | fps: 0",
+            font_size=16,
+            screen_space=True,
+            anchor="top-left",
+            material=gfx.TextMaterial(color=(0.4, 0.4, 0.4, 1.0)),
+        )
+        self._hud_text.local.position = (10, 10, 0)
+        self._scene.add(self._hud_text)
+
+    # ======================================================= per-frame update
+    def update(self, state: GameState):
+        """Read a GameState and update all scene objects."""
+        body = np.asarray(state.body)
+        length = int(state.length)
+        food = np.asarray(state.food)
+        alive = bool(state.alive)
+        score = int(state.score)
+
+        s = self.unit_size
+        h = self._half
+        arena = self._arena_size
+
+        if alive:
+            head_pos = body[0].astype(np.float64)
+            hx, hy, hz = head_pos * s + h
+
+            # Head mesh
+            self._head_mesh.local.position = (hx, hy, hz)
+            self._head_mesh.visible = True
+
+            # Tail instances
+            if length > 1:
+                self._tail_mesh.visible = True
+                zero_mat = np.zeros((4, 4), dtype=np.float32)
+                for i in range(1, length):
+                    tx, ty, tz = body[i].astype(np.float64) * s + h
+                    mat = np.eye(4, dtype=np.float32)
+                    mat[3, 0] = tx
+                    mat[3, 1] = ty
+                    mat[3, 2] = tz
+                    self._tail_mesh.set_matrix_at(i - 1, mat)
+                # Zero out the next slot to hide the previously vacated tail tip
+                if length - 1 < self.max_length:
+                    self._tail_mesh.set_matrix_at(length - 1, zero_mat)
+            else:
+                self._tail_mesh.visible = False
+
+            # Food
+            fx, fy, fz = food.astype(np.float64) * s + h
+            self._food_mesh.local.position = (fx, fy, fz)
+            self._food_mesh.visible = True
+
+            # Support lines: head → +x wall, head → +y wall, head → z=0 wall
+            support_pts = np.array([
+                [hx, hy, hz], [arena, hy, hz],   # to +x wall
+                [hx, hy, hz], [hx, arena, hz],   # to +y wall
+                [hx, hy, hz], [hx, hy, 0],       # to z=0 wall
+            ], dtype=np.float32)
+            self._support_lines.geometry.positions = gfx.Buffer(support_pts)
+
+            # Location supports — head
+            self._head_loc_xy.local.position = (hx, hy, 0)
+            self._head_loc_xz.local.position = (hx, arena, hz)
+            self._head_loc_yz.local.position = (arena, hy, hz)
+            self._head_loc_xy.visible = True
+            self._head_loc_xz.visible = True
+            self._head_loc_yz.visible = True
+
+            # Location supports — food
+            self._food_loc_xy.local.position = (fx, fy, 0)
+            self._food_loc_xz.local.position = (fx, arena, fz)
+            self._food_loc_yz.local.position = (arena, fy, fz)
+            self._food_loc_xy.visible = True
+            self._food_loc_xz.visible = True
+            self._food_loc_yz.visible = True
+        else:
+            self._head_mesh.visible = False
+            self._tail_mesh.visible = False
+            self._food_mesh.visible = False
+            self._support_lines.geometry.positions = gfx.Buffer(np.zeros((6, 3), dtype=np.float32))
+            for m in (self._head_loc_xy, self._head_loc_xz, self._head_loc_yz,
+                      self._food_loc_xy, self._food_loc_xz, self._food_loc_yz):
+                m.visible = False
+
+        # HUD
+        self._frame_count += 1
+        elapsed = time.time() - self._start_time
+        fps = self._frame_count / elapsed if elapsed > 0 else 0
+        self._hud_text.set_text(f"score: {score} | length: {length} | fps: {fps:.0f}")
+
+        self._renderer.render(self._scene, self._camera)
+        self._canvas.request_draw()
+
+    def close(self):
+        self._canvas.close()
+
+    @property
+    def canvas(self):
+        return self._canvas
+
+    def run(self):
+        """Start the event loop (blocking)."""
+        loop.run()
