@@ -138,7 +138,7 @@ class Renderer:
         self._loc_geo_yz = gfx.box_geometry(thin, s, s)  # flat in x
 
         # Head location supports (green)
-        head_loc_mat = gfx.MeshPhongMaterial(color=(0.1, 0.95, 0.2, 0.1))
+        head_loc_mat = gfx.MeshPhongMaterial(color=(0.1, 0.95, 0.2, 0.4))
         head_loc_mat.side = "both"
         self._head_loc_xy = gfx.Mesh(self._loc_geo_xy, head_loc_mat)
         self._head_loc_xz = gfx.Mesh(self._loc_geo_xz, head_loc_mat)
@@ -146,7 +146,7 @@ class Renderer:
         self._scene.add(self._head_loc_xy, self._head_loc_xz, self._head_loc_yz)
 
         # Food location supports (red)
-        food_loc_mat = gfx.MeshPhongMaterial(color=(1.0, 0.15, 0.1, 0.08))
+        food_loc_mat = gfx.MeshPhongMaterial(color=(1.0, 0.15, 0.1, 0.35))
         food_loc_mat.side = "both"
         self._food_loc_xy = gfx.Mesh(self._loc_geo_xy, food_loc_mat)
         self._food_loc_xz = gfx.Mesh(self._loc_geo_xz, food_loc_mat)
