@@ -41,10 +41,11 @@ class Renderer:
         self._scene = gfx.Scene()
         self._scene.add(gfx.Background(material=gfx.BackgroundMaterial((1, 1, 1, 1))))
 
-        # Camera — positioned at the open corner, looking into the arena walls
+        # Camera — at the open corner (low x, low y, high z) looking into the 3 walls
         center = self._arena_size / 2
+        a = self._arena_size
         self._camera = gfx.PerspectiveCamera(fov=60)
-        self._camera.local.position = (center - self._arena_size, center, center - self._arena_size)
+        self._camera.local.position = (center - a, center - a * 0.3, center + a)
         self._camera.look_at((center, center, center))
         self._controller = gfx.OrbitController()
         self._controller.add_camera(self._camera)
@@ -86,7 +87,7 @@ class Renderer:
 
         positions = np.array(positions, dtype=np.float32)
         geo = gfx.Geometry(positions=positions)
-        mat = gfx.LineSegmentMaterial(color=(0.6, 0.6, 0.6, 1.0), thickness=1.0)
+        mat = gfx.LineSegmentMaterial(color=(0.75, 0.75, 0.75, 0.3), thickness=1.0)
         self._arena_lines = gfx.Line(geo, mat)
         self._scene.add(self._arena_lines)
 
@@ -95,14 +96,14 @@ class Renderer:
         """Individual meshes for head + pooled tail cubes."""
         self._cube_geo = gfx.box_geometry(self._cube_scale, self._cube_scale, self._cube_scale)
 
-        # Head: green translucent
-        head_mat = gfx.MeshPhongMaterial(color=(0.0, 1.0, 0.0, 0.35))
+        # Head: vivid green
+        head_mat = gfx.MeshPhongMaterial(color=(0.1, 0.95, 0.2, 0.7))
         head_mat.side = "both"
         self._head_mesh = gfx.Mesh(self._cube_geo, head_mat)
         self._scene.add(self._head_mesh)
 
         # Tail: pool of individual meshes, grown on demand
-        self._tail_mat = gfx.MeshPhongMaterial(color=(0.78, 1.0, 0.0, 0.45))
+        self._tail_mat = gfx.MeshPhongMaterial(color=(0.4, 0.9, 0.1, 0.65))
         self._tail_mat.side = "both"
         self._tail_meshes: list[gfx.Mesh] = []
         self._tail_active = 0  # how many are currently visible
@@ -110,7 +111,7 @@ class Renderer:
     # ------------------------------------------------------------------ food
     def _build_food(self):
         cube_geo = gfx.box_geometry(self._cube_scale, self._cube_scale, self._cube_scale)
-        food_mat = gfx.MeshPhongMaterial(color=(1.0, 0.0, 0.0, 0.45))
+        food_mat = gfx.MeshPhongMaterial(color=(1.0, 0.15, 0.1, 0.75))
         food_mat.side = "both"
         self._food_mesh = gfx.Mesh(cube_geo, food_mat)
         self._scene.add(self._food_mesh)
@@ -121,7 +122,7 @@ class Renderer:
         # Placeholder positions; updated each frame
         positions = np.zeros((6, 3), dtype=np.float32)
         geo = gfx.Geometry(positions=positions)
-        mat = gfx.LineSegmentMaterial(color=(0.5, 0.5, 0.5, 0.5), thickness=1.0)
+        mat = gfx.LineSegmentMaterial(color=(0.5, 0.5, 0.5, 0.25), thickness=1.0)
         self._support_lines = gfx.Line(geo, mat)
         self._scene.add(self._support_lines)
 
@@ -137,7 +138,7 @@ class Renderer:
         self._loc_geo_yz = gfx.box_geometry(thin, s, s)  # flat in x
 
         # Head location supports (green)
-        head_loc_mat = gfx.MeshPhongMaterial(color=(0.0, 1.0, 0.0, 0.15))
+        head_loc_mat = gfx.MeshPhongMaterial(color=(0.1, 0.95, 0.2, 0.1))
         head_loc_mat.side = "both"
         self._head_loc_xy = gfx.Mesh(self._loc_geo_xy, head_loc_mat)
         self._head_loc_xz = gfx.Mesh(self._loc_geo_xz, head_loc_mat)
@@ -145,7 +146,7 @@ class Renderer:
         self._scene.add(self._head_loc_xy, self._head_loc_xz, self._head_loc_yz)
 
         # Food location supports (red)
-        food_loc_mat = gfx.MeshPhongMaterial(color=(1.0, 0.0, 0.0, 0.1))
+        food_loc_mat = gfx.MeshPhongMaterial(color=(1.0, 0.15, 0.1, 0.08))
         food_loc_mat.side = "both"
         self._food_loc_xy = gfx.Mesh(self._loc_geo_xy, food_loc_mat)
         self._food_loc_xz = gfx.Mesh(self._loc_geo_xz, food_loc_mat)
