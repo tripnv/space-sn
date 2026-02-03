@@ -39,11 +39,12 @@ class Renderer:
 
         # Scene
         self._scene = gfx.Scene()
+        self._scene.add(gfx.Background(material=gfx.BackgroundMaterial((1, 1, 1, 1))))
 
-        # Camera
+        # Camera — positioned at the open corner, looking into the arena walls
         center = self._arena_size / 2
         self._camera = gfx.PerspectiveCamera(fov=60)
-        self._camera.local.position = (center + self._arena_size, center, center + self._arena_size)
+        self._camera.local.position = (center - self._arena_size, center, center - self._arena_size)
         self._camera.look_at((center, center, center))
         self._controller = gfx.OrbitController()
         self._controller.add_camera(self._camera)
@@ -153,7 +154,7 @@ class Renderer:
 
     # ------------------------------------------------------------------- hud
     def _build_hud(self):
-        hud_mat = gfx.TextMaterial(color=(0.85, 0.85, 0.85, 1.0), outline_color="#000", outline_thickness=0.3)
+        hud_mat = gfx.TextMaterial(color=(0.1, 0.1, 0.1, 1.0))
         self._hud_text = gfx.Text(
             text="",
             font_size=14,
