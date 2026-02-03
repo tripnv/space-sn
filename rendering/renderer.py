@@ -90,24 +90,20 @@ class Renderer:
 
     # ------------------------------------------------------------------ snake
     def _build_snake(self):
-        """InstancedMesh for snake body cubes."""
-        cube_geo = gfx.box_geometry(self._cube_scale, self._cube_scale, self._cube_scale)
+        """Individual meshes for head + pooled tail cubes."""
+        self._cube_geo = gfx.box_geometry(self._cube_scale, self._cube_scale, self._cube_scale)
 
         # Head: green translucent
         head_mat = gfx.MeshPhongMaterial(color=(0.0, 1.0, 0.0, 0.35))
         head_mat.side = "both"
-        self._head_mesh = gfx.Mesh(cube_geo, head_mat)
+        self._head_mesh = gfx.Mesh(self._cube_geo, head_mat)
         self._scene.add(self._head_mesh)
 
-        # Tail: yellow-green translucent, instanced
-        tail_mat = gfx.MeshPhongMaterial(color=(0.78, 1.0, 0.0, 0.45))
-        tail_mat.side = "both"
-        self._tail_mesh = gfx.InstancedMesh(cube_geo, tail_mat, self.max_length)
-        # Zero all instance matrices so unused slots are invisible
-        self._tail_mesh.instance_buffer.data["matrix"] = 0
-        self._tail_mesh.instance_buffer.update_full()
-        self._tail_mesh.visible = False
-        self._scene.add(self._tail_mesh)
+        # Tail: pool of individual meshes, grown on demand
+        self._tail_mat = gfx.MeshPhongMaterial(color=(0.78, 1.0, 0.0, 0.45))
+        self._tail_mat.side = "both"
+        self._tail_meshes: list[gfx.Mesh] = []
+        self._tail_active = 0  # how many are currently visible
 
     # ------------------------------------------------------------------ food
     def _build_food(self):
@@ -187,22 +183,23 @@ class Renderer:
             self._head_mesh.local.position = (hx, hy, hz)
             self._head_mesh.visible = True
 
-            # Tail instances
-            if length > 1:
-                self._tail_mesh.visible = True
-                zero_mat = np.zeros((4, 4), dtype=np.float32)
-                for i in range(1, length):
-                    tx, ty, tz = body[i].astype(np.float64) * s + h
-                    mat = np.eye(4, dtype=np.float32)
-                    mat[3, 0] = tx
-                    mat[3, 1] = ty
-                    mat[3, 2] = tz
-                    self._tail_mesh.set_matrix_at(i - 1, mat)
-                # Zero out the next slot to hide the previously vacated tail tip
-                if length - 1 < self.max_length:
-                    self._tail_mesh.set_matrix_at(length - 1, zero_mat)
-            else:
-                self._tail_mesh.visible = False
+            # Tail — individual meshes from pool
+            n_tail = length - 1
+            # Grow pool if needed
+            while len(self._tail_meshes) < n_tail:
+                m = gfx.Mesh(self._cube_geo, self._tail_mat)
+                m.visible = False
+                self._tail_meshes.append(m)
+                self._scene.add(m)
+            # Position active segments
+            for i in range(n_tail):
+                tx, ty, tz = body[i + 1].astype(np.float64) * s + h
+                self._tail_meshes[i].local.position = (tx, ty, tz)
+                self._tail_meshes[i].visible = True
+            # Hide excess from previous frame
+            for i in range(n_tail, self._tail_active):
+                self._tail_meshes[i].visible = False
+            self._tail_active = n_tail
 
             # Food
             fx, fy, fz = food.astype(np.float64) * s + h
@@ -234,7 +231,9 @@ class Renderer:
             self._food_loc_yz.visible = True
         else:
             self._head_mesh.visible = False
-            self._tail_mesh.visible = False
+            for i in range(self._tail_active):
+                self._tail_meshes[i].visible = False
+            self._tail_active = 0
             self._food_mesh.visible = False
             self._support_lines.geometry.positions = gfx.Buffer(np.zeros((6, 3), dtype=np.float32))
             for m in (self._head_loc_xy, self._head_loc_xz, self._head_loc_yz,
