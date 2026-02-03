@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import heapq
 from collections import deque
 from itertools import product
 
@@ -39,6 +40,9 @@ class _Node:
 
     def __hash__(self):
         return hash(self.position)
+
+    def __lt__(self, other):
+        return self.position < other.position
 
     def __repr__(self):
         return f"Node{self.position}"
@@ -193,7 +197,7 @@ class BestFirstAgent(_SearchBase):
             child = _Node(neighbour_pos, parent=current)
             if (
                 _valid(neighbour_pos, self.grid_num)
-                and _Node(neighbour_pos) not in occupied
+                and neighbour_pos not in occupied
                 and child not in explored
             ):
                 children.append(child)
@@ -217,36 +221,46 @@ class AStarAgent(_SearchBase):
         if head == goal:
             return deque()
 
-        result = self._recursive_best_first(start, start, goal, occupied, set())
-        if result is not None:
-            return _unwrap_path(result)
+        # g_cost tracks actual path cost (number of steps) for each visited position
+        g_cost: dict[tuple, int] = {head: 0}
+        # Priority queue entries: (f_cost, tie_breaker, node)
+        counter = 0
+        open_set: list[tuple[float, int, _Node]] = [
+            (self._heuristic(head, goal), counter, start)
+        ]
+        closed: set[tuple] = set()
+
+        while open_set:
+            _, _, current = heapq.heappop(open_set)
+
+            if current.position == goal:
+                return _unwrap_path(current)
+
+            if current.position in closed:
+                continue
+            closed.add(current.position)
+
+            current_g = g_cost[current.position]
+
+            for neighbour_pos in self._adj[current.position]:
+                if (
+                    not _valid(neighbour_pos, self.grid_num)
+                    or neighbour_pos in occupied
+                    or neighbour_pos in closed
+                ):
+                    continue
+
+                new_g = current_g + 1
+                if new_g < g_cost.get(neighbour_pos, float("inf")):
+                    g_cost[neighbour_pos] = new_g
+                    f = new_g + self._heuristic(neighbour_pos, goal)
+                    child = _Node(neighbour_pos, parent=current)
+                    counter += 1
+                    heapq.heappush(open_set, (f, counter, child))
+
         return deque()
 
-    def _heuristic(self, start: tuple, current: tuple, goal: tuple) -> float:
-        # f(x) = g(x) + h(x)
-        gx = sum((a - b) ** 2 for a, b in zip(start, current)) ** 0.5
-        hx = sum(abs(a - b) for a, b in zip(current, goal))
-        return gx + hx
-
-    def _recursive_best_first(
-        self, start: _Node, current: _Node, goal: tuple, occupied: set, explored: set
-    ) -> _Node | None:
-        if current.position == goal:
-            return current
-        explored.add(current)
-
-        children = []
-        for neighbour_pos in self._adj[current.position]:
-            child = _Node(neighbour_pos, parent=current)
-            if (
-                _valid(neighbour_pos, self.grid_num)
-                and _Node(neighbour_pos) not in occupied
-                and child not in explored
-            ):
-                children.append(child)
-
-        if not children:
-            return None
-
-        children.sort(key=lambda n: self._heuristic(start.position, n.position, goal))
-        return self._recursive_best_first(start, children[0], goal, occupied, explored)
+    @staticmethod
+    def _heuristic(pos: tuple, goal: tuple) -> int:
+        """Manhattan distance — admissible and consistent for 6-direction 3D grid."""
+        return sum(abs(a - b) for a, b in zip(pos, goal))
