@@ -78,7 +78,7 @@ class _SearchBase:
     def _occupied_set(self, state: GameState) -> set[tuple]:
         body = np.asarray(state.body)
         length = int(state.length)
-        return {tuple(body[i]) for i in range(length)}
+        return {tuple(int(c) for c in body[i]) for i in range(length)}
 
     def _fallback(self, state: GameState) -> int:
         head = tuple(int(x) for x in np.asarray(state.body[0]))
@@ -115,7 +115,7 @@ class BFSAgent(_SearchBase):
                 child = _Node(neighbour_pos, parent=current)
                 if (
                     _valid(neighbour_pos, self.grid_num)
-                    and _Node(neighbour_pos) not in occupied
+                    and neighbour_pos not in occupied
                     and child not in explored
                     and child not in frontier
                 ):
@@ -151,7 +151,7 @@ class DFSAgent(_SearchBase):
                 child = _Node(neighbour_pos, parent=current)
                 if (
                     _valid(neighbour_pos, self.grid_num)
-                    and _Node(neighbour_pos) not in occupied
+                    and neighbour_pos not in occupied
                     and child not in explored
                     and child not in frontier
                 ):
