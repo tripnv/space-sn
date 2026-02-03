@@ -109,23 +109,24 @@ class BFSAgent(_SearchBase):
             return deque()
 
         frontier: deque[_Node] = deque([start])
-        explored: set[_Node] = set()
+        visited: set[tuple] = {head}
 
         while frontier:
             current = frontier.popleft()
-            explored.add(current)
 
             for neighbour_pos in self._adj[current.position]:
-                child = _Node(neighbour_pos, parent=current)
                 if (
-                    _valid(neighbour_pos, self.grid_num)
-                    and neighbour_pos not in occupied
-                    and child not in explored
-                    and child not in frontier
+                    not _valid(neighbour_pos, self.grid_num)
+                    or neighbour_pos in occupied
+                    or neighbour_pos in visited
                 ):
-                    if neighbour_pos == goal:
-                        return _unwrap_path(child)
-                    frontier.append(child)
+                    continue
+
+                child = _Node(neighbour_pos, parent=current)
+                if neighbour_pos == goal:
+                    return _unwrap_path(child)
+                visited.add(neighbour_pos)
+                frontier.append(child)
 
         return deque()
 
