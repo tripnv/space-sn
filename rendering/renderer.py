@@ -45,7 +45,7 @@ class Renderer:
         center = self._arena_size / 2
         a = self._arena_size
         self._camera = gfx.PerspectiveCamera(fov=60)
-        self._camera.local.position = (center - a * 0.8, center + a * 1.2, center - a * 0.8)
+        self._camera.local.position = (center - a * 0.96, center + a * 1.44, center - a * 0.96)
         self._camera.look_at((center, center, center))
         self._controller = gfx.OrbitController()
         self._controller.add_camera(self._camera)
