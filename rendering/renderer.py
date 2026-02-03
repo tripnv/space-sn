@@ -67,7 +67,7 @@ class Renderer:
 
     # ------------------------------------------------------------------ arena
     def _build_arena(self):
-        """Wireframe grid on 3 faces: xy at z=0, xz at y=max, yz at x=max."""
+        """Wireframe grid on 3 faces: xy at z=max, xz at y=0, yz at x=max."""
         positions = []
         n = self.grid_num
         s = self.unit_size
@@ -75,12 +75,12 @@ class Renderer:
 
         for i in range(n + 1):
             v = i * s
-            # xy face (z=0)
-            positions.extend([(0, v, 0), (arena, v, 0)])
-            positions.extend([(v, 0, 0), (v, arena, 0)])
-            # xz face (y=max)
-            positions.extend([(0, arena, v), (arena, arena, v)])
-            positions.extend([(v, arena, 0), (v, arena, arena)])
+            # xy face (z=max)
+            positions.extend([(0, v, arena), (arena, v, arena)])
+            positions.extend([(v, 0, arena), (v, arena, arena)])
+            # xz face (y=0)
+            positions.extend([(0, 0, v), (arena, 0, v)])
+            positions.extend([(v, 0, 0), (v, 0, arena)])
             # yz face (x=max)
             positions.extend([(arena, 0, v), (arena, arena, v)])
             positions.extend([(arena, v, 0), (arena, v, arena)])
@@ -210,17 +210,17 @@ class Renderer:
             self._food_mesh.local.position = (fx, fy, fz)
             self._food_mesh.visible = True
 
-            # Support lines: head → +x wall, head → +y wall, head → z=0 wall
+            # Support lines: head → +x wall, head → y=0 wall, head → +z wall
             support_pts = np.array([
                 [hx, hy, hz], [arena, hy, hz],   # to +x wall
-                [hx, hy, hz], [hx, arena, hz],   # to +y wall
-                [hx, hy, hz], [hx, hy, 0],       # to z=0 wall
+                [hx, hy, hz], [hx, 0, hz],       # to y=0 wall
+                [hx, hy, hz], [hx, hy, arena],   # to +z wall
             ], dtype=np.float32)
             self._support_lines.geometry.positions = gfx.Buffer(support_pts)
 
             # Location supports — head
-            self._head_loc_xy.local.position = (hx, hy, 0)
-            self._head_loc_xz.local.position = (hx, arena, hz)
+            self._head_loc_xy.local.position = (hx, hy, arena)
+            self._head_loc_xz.local.position = (hx, 0, hz)
             self._head_loc_yz.local.position = (arena, hy, hz)
             self._head_loc_xy.visible = True
             self._head_loc_xz.visible = True
@@ -228,7 +228,7 @@ class Renderer:
 
             # Location supports — food
             self._food_loc_xy.local.position = (fx, fy, 0)
-            self._food_loc_xz.local.position = (fx, arena, fz)
+            self._food_loc_xz.local.position = (fx, 0, fz)
             self._food_loc_yz.local.position = (arena, fy, fz)
             self._food_loc_xy.visible = True
             self._food_loc_xz.visible = True
