@@ -52,7 +52,7 @@ def run(agent: str, mode: str, grid_num: int | None, seed: int, max_steps: int):
     if mode == "headless":
         _run_headless(state, agent_obj, step_jit, grid_num, max_steps)
     else:
-        _run_render(state, agent_obj, step_jit, grid_num, max_steps)
+        _run_render(state, agent_obj, step_jit, grid_num, max_steps, agent_name=agent)
 
 
 def _run_headless(state, agent_obj, step_jit, grid_num, max_steps):
@@ -70,11 +70,11 @@ def _run_headless(state, agent_obj, step_jit, grid_num, max_steps):
     )
 
 
-def _run_render(state, agent_obj, step_jit, grid_num, max_steps):
+def _run_render(state, agent_obj, step_jit, grid_num, max_steps, agent_name=""):
     from rendering.renderer import Renderer
     from rendercanvas.auto import loop
 
-    renderer = Renderer(grid_num=grid_num)
+    renderer = Renderer(grid_num=grid_num, agent_name=agent_name)
     renderer.update(state)
 
     frame_interval = 1.0 / 30  # target ~30 fps for visualization

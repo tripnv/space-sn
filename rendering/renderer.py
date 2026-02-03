@@ -21,10 +21,11 @@ class Renderer:
     - HUD text overlay
     """
 
-    def __init__(self, grid_num: int = 10, unit_size: float = 1.0):
+    def __init__(self, grid_num: int = 10, unit_size: float = 1.0, agent_name: str = ""):
         self.grid_num = grid_num
         self.unit_size = unit_size
         self.max_length = grid_num ** 3
+        self._agent_name = agent_name
         self._arena_size = grid_num * unit_size
         self._half = unit_size / 2
         self._cube_scale = unit_size * 0.9  # slightly smaller than cell
@@ -152,14 +153,15 @@ class Renderer:
 
     # ------------------------------------------------------------------- hud
     def _build_hud(self):
+        hud_mat = gfx.TextMaterial(color=(0.85, 0.85, 0.85, 1.0), outline_color="#000", outline_thickness=0.3)
         self._hud_text = gfx.Text(
-            text="score: 0 | length: 1 | fps: 0",
-            font_size=16,
+            text="",
+            font_size=14,
             screen_space=True,
             anchor="top-left",
-            material=gfx.TextMaterial(color=(0.4, 0.4, 0.4, 1.0)),
+            material=hud_mat,
         )
-        self._hud_text.local.position = (10, 10, 0)
+        self._hud_text.local.position = (12, 16, 0)
         self._scene.add(self._hud_text)
 
     # ======================================================= per-frame update
@@ -242,9 +244,22 @@ class Renderer:
 
         # HUD
         self._frame_count += 1
+        step_count = int(state.step_count)
         elapsed = time.time() - self._start_time
         fps = self._frame_count / elapsed if elapsed > 0 else 0
-        self._hud_text.set_text(f"score: {score} | length: {length} | fps: {fps:.0f}")
+        sps = step_count / elapsed if elapsed > 0 else 0
+        fill = length / self.max_length * 100
+
+        lines = [
+            f"score: {score}  length: {length}/{self.max_length} ({fill:.1f}%)",
+            f"steps: {step_count}  fps: {fps:.0f}  sps: {sps:.0f}",
+            f"grid: {self.grid_num}³  elapsed: {elapsed:.1f}s",
+        ]
+        if self._agent_name:
+            lines.append(f"agent: {self._agent_name}")
+        if not alive:
+            lines.append("DEAD")
+        self._hud_text.set_text("\n".join(lines))
 
         self._renderer.render(self._scene, self._camera)
         self._canvas.request_draw()
